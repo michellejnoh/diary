@@ -1,4 +1,4 @@
-export const VERSION = "18"; // bump on every change; shown at the bottom of Archive
+export const VERSION = "19"; // bump on every change; shown at the bottom of Archive
 // diary — app code. Loaded (and hot-swapped) by index.html.
 // mount(root, state) draws the app and returns an unmount function.
 
@@ -153,6 +153,16 @@ function stampSVG(k) {
 const ROUGH = `<filter id="rough" x="-10%" y="-10%" width="120%" height="120%"><feTurbulence type="fractalNoise" baseFrequency=".05" numOctaves="2" seed="3"/><feDisplacementMap in="SourceGraphic" scale="2.6"/></filter>`;
 const CAMERA = `<svg class="cam" viewBox="0 0 40 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><g filter="url(#rough)"><path d="M3.5 6.5h9l2.2-3h10.6l2.2 3h9v14h-33z"/><circle cx="20" cy="13.5" r="4.6"/></g></svg>`;
 const PENCIL = `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><g filter="url(#rough)"><path d="M4 20l1.2-4.4L15.8 5a1.9 1.9 0 0 1 2.7 0l.5.5a1.9 1.9 0 0 1 0 2.7L8.4 18.8z"/><path d="M13.8 7l3.2 3.2"/></g></svg>`;
+const LAYER_ICONS = (() => {
+  const sq = (y, on) => `<rect x="5" y="${y}" width="14" height="6" rx="1" ${on ? 'fill="currentColor"' : 'fill="none"'}/>`;
+  const svg = inner => `<svg viewBox="0 0 24 24" aria-hidden="true" stroke="currentColor" stroke-width="1.5" fill="none">${inner}</svg>`;
+  return {
+    front: svg(`${sq(14, false)}${sq(9, false)}${sq(4, true)}`),
+    up: svg(`${sq(14, false)}${sq(9, true)}<path d="M12 3.5v3M10.5 5l1.5-1.5L13.5 5" stroke-linecap="round"/>`),
+    down: svg(`${sq(4, false)}${sq(9, true)}<path d="M12 17.5v3M10.5 19l1.5 1.5 1.5-1.5" stroke-linecap="round"/>`),
+    back: svg(`${sq(4, false)}${sq(9, false)}${sq(14, true)}`),
+  };
+})();
 const ROTATE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18.5 9.5a7 7 0 1 0 .8 5.6"/><path d="M19 4.5v5h-5"/></svg>`;
 
 // ---------- backup bookkeeping ----------
@@ -686,7 +696,7 @@ export async function mount(root, state) {
     if (kind !== decoKind) { decoKind = kind; decoTab = tabsFor[0]?.[0] || null; }
     const b = (attrs, label, pressed) => `<button ${attrs}${pressed != null ? ` aria-pressed="${!!pressed}"` : ""}>${label}</button>`;
     const opt = {
-      add: () => `${b('data-deco="text"', "Text")}${b('data-deco="tape" aria-label="Tape"', `<span class="tape-swatch"></span> Tape`)}${b('data-deco="photo"', "Photo")}${b('data-deco="paste"', "Paste")}${b('data-deco="commons"', "Wikimedia")}`,
+      add: () => `${b('data-deco="text"', "Text")}${b('data-deco="tape" aria-label="Tape" title="Tape"', `<span class="tape-swatch"></span>`)}${b('data-deco="photo"', "Photo")}${b('data-deco="paste"', "Paste")}${b('data-deco="commons"', "Wikimedia")}`,
       page: () => `<span class="group">${[["card", "Card"], ["kraft", "Kraft"], ["grid", "Grid"], ["album", "Album"]].map(([f, n]) => b(`data-paper="${f}" class="paper-btn pb-${f}"`, n, curPaper() === f)).join("")}</span>
         <span class="group">${[["neat", "Neat"], ["loose", "Loose"]].map(([f, n]) => b(`data-look="${f}"`, n, lookNow() === f)).join("")}</span>${b('data-deco="tidy"', "Tidy up")}`,
       style: () => `<span class="group">${[["hand", "Hand"], ["type", "Type"], ["press", "Press"]].map(([f, n]) => b(`data-tx="font" data-v="${f}" class="f-${f}"`, n, (it.font || "hand") === f)).join("")}</span>
@@ -696,7 +706,7 @@ export async function mount(root, state) {
       frame: () => [["print", "Print"], ["instant", "Instant"], ["film", "Film"], ["torn", "Torn"]].map(([f, n]) => b(`data-ph="frame" data-v="${f}"`, n, (it.frame || "print") === f)).join(""),
       look: () => [["none", "Plain"], ["grain", "Grain"], ["warm", "Warm"], ["bw", "B&amp;W"]].map(([f, n]) => b(`data-ph="look" data-v="${f}"`, n, (it.look || "none") === f)).join(""),
     };
-    const actions = (it ? (it.kind === "image" ? b('data-deco="outline"', "Outline", it.outline) : "") + b('data-deco="back"', "Send back") : "");
+    const actions = (it ? (it.kind === "image" ? b('data-deco="outline"', "Outline", it.outline) : "") + `<span class="group" aria-label="Order">${[["front", "Front", LAYER_ICONS.front], ["up", "Forward", LAYER_ICONS.up], ["down", "Backward", LAYER_ICONS.down], ["back", "Back", LAYER_ICONS.back]].map(([k, n, ic]) => b(`data-layer="${k}" class="layer" aria-label="${n}" title="${n}"`, ic)).join("")}</span>` : "");
     const panel = (decoTab ? opt[decoTab]() : "") + (actions ? `<span class="group-sep"></span>${actions}` : "");
     // keep the option row where it was scrolled, as long as the same menu stays open
     const keyNow = `${kind}:${decoTab}`;
@@ -728,12 +738,17 @@ export async function mount(root, state) {
       col.items.forEach(i => { if (i.kind === "photo") i.auto = true; });
       drawBoard(); saveCollage();
     }
-    else if (a === "back" && it) {
-      it.z = botZ() - 1; col.items.forEach(i => { i.z = (i.z || 1) - it.z + 1; }); // keep z positive
-      col.items.forEach(i => { const el = itemEl(i.id); if (el) el.style.zIndex = i.z; });
-      saveCollage();
-    }
     else if (a === "outline" && it) { it.outline = !it.outline; redrawItem(it); select(it.id); saveCollage(); }
+  }
+  function layerAction(how) {
+    const it = col.items.find(i => i.id === selectedId); if (!it) return;
+    const order = [...col.items].sort((a, b) => (a.z || 0) - (b.z || 0));
+    const i = order.indexOf(it);
+    order.splice(i, 1);
+    const to = how === "front" ? order.length : how === "back" ? 0 : how === "up" ? Math.min(order.length, i + 1) : Math.max(0, i - 1);
+    order.splice(to, 0, it);
+    order.forEach((x, n) => { x.z = n + 1; const el = itemEl(x.id); if (el) el.style.zIndex = x.z; });
+    saveCollage();
   }
   let paperNow = "card";
   const curPaper = () => paperNow;
@@ -1027,7 +1042,7 @@ export async function mount(root, state) {
 
   // ---------- events (all removed on unmount) ----------
   on(document, "click", async e => {
-    const t = e.target.closest("[data-camera],[data-library],[data-open],[data-close],[data-step],[data-delete],[data-export],[data-import],[data-folder],[data-resume],[data-stopfolder],[data-importfolder],[data-font],[data-decorate],[data-deco],[data-tx],[data-sheet-close],[data-pick],[data-ph],[data-paper],[data-nav],[data-look],[data-dtab]");
+    const t = e.target.closest("[data-camera],[data-library],[data-open],[data-close],[data-step],[data-delete],[data-export],[data-import],[data-folder],[data-resume],[data-stopfolder],[data-importfolder],[data-font],[data-decorate],[data-deco],[data-tx],[data-sheet-close],[data-pick],[data-ph],[data-paper],[data-nav],[data-look],[data-dtab],[data-layer]");
     if (!t) {
       if (viewerEl && e.target.classList?.contains("stage")) closeViewer();
       if (sheetEl && e.target === sheetEl) closeCommons();
@@ -1045,6 +1060,7 @@ export async function mount(root, state) {
     else if (t.dataset.deco) decoAction(t.dataset.deco, t);
     else if (t.dataset.tx) textAction(t);
     else if (t.dataset.ph) photoAction(t);
+    else if (t.dataset.layer) layerAction(t.dataset.layer);
     else if (t.dataset.dtab) { decoTab = decoTab === t.dataset.dtab ? null : t.dataset.dtab; renderDecoBar(); }
     else if (t.dataset.paper) setPaper(t.dataset.paper);
     else if (t.dataset.look) {
