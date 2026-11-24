@@ -27,8 +27,3 @@ Setup (once):
 4. Project settings → Your apps → Web → register → copy the config into `firebase-config.js`.
 
 Photos are stored resized inside Firestore (free tier, no card needed).
-
-## My handwriting
-
-Archive → My handwriting. Draw 14 consonants, 10 vowels, English letters, numbers and marks once.
-Korean syllables are built from the consonants and vowels. Notes and collage text ("Mine") show in your handwriting.
