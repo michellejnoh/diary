@@ -635,3 +635,5 @@ header.top { padding-bottom: 12px; }
 /* in Decorate, a finger on a piece can still scroll the page; handles stay grab-only */
 .board.editing .ci { touch-action: pan-y; }
 .board.editing .h-rot, .board.editing .h-del { touch-action: none; }
+/* a picked piece belongs to your finger: no scrolling, it drags at once */
+.board.editing .ci.sel { touch-action: none; }

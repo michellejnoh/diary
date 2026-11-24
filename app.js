@@ -1,4 +1,4 @@
-export const VERSION = "52"; // bump on every change; shown at the bottom of Archive
+export const VERSION = "53"; // bump on every change; shown at the bottom of Archive
 // diary — app code. Loaded (and hot-swapped) by index.html.
 // mount(root, state) draws the app and returns an unmount function.
 
@@ -591,6 +591,11 @@ export async function mount(root, state) {
     boardEl.innerHTML = col.items.map(itemHTML).join("") + add;
     boardEl.querySelectorAll(".caption").forEach(grow);
     spaceRows();
+    // heights can change once photos and fonts finish loading (slow on phones): lay out again then
+    const again = () => { if (!boardEl || drag) return; boardEl.querySelectorAll(".caption").forEach(grow); spaceRows(); };
+    boardEl.querySelectorAll("img").forEach(img => { if (!img.complete) img.addEventListener("load", again, { once: true }); });
+    document.fonts?.ready.then(again);
+    setTimeout(again, 400);
   }
   // rows sit right under the tallest thing in the row above (photo + its note), not at a fixed guess
   function spaceRows() {
@@ -611,7 +616,7 @@ export async function mount(root, state) {
     const add = boardEl.querySelector(".ci-add");
     if (add) {
       const a = add.getBoundingClientRect();
-      const hit = [...boardEl.querySelectorAll(".ci:not([data-row])")].some(el => {
+      const hit = [...boardEl.querySelectorAll(".ci:not(.ci-add)")].some(el => {
         const b = el.getBoundingClientRect();
         return a.left < b.right - 8 && a.right > b.left + 8 && a.top < b.bottom - 8 && a.bottom > b.top + 8;
       });
@@ -811,6 +816,7 @@ export async function mount(root, state) {
   let held = null;
   function onDown(e) {
     if (e.pointerType === "touch" && !e.target.closest(".h-rot, .h-del") && e.target.closest(".ci:not(.ci-add)")
+        && e.target.closest(".ci").dataset.id !== selectedId // a piece you already picked drags right away
         && !(e.target.closest(".ctext, .sctext")?.isContentEditable)) {
       clearTimeout(held?.timer);
       const fake = { target: e.target, clientX: e.clientX, clientY: e.clientY, pointerId: e.pointerId, pointerType: "touch", preventDefault() {} };
