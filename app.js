@@ -1,4 +1,4 @@
-export const VERSION = "46"; // bump on every change; shown at the bottom of Archive
+export const VERSION = "47"; // bump on every change; shown at the bottom of Archive
 // diary — app code. Loaded (and hot-swapped) by index.html.
 // mount(root, state) draws the app and returns an unmount function.
 
@@ -588,7 +588,7 @@ export async function mount(root, state) {
   function spaceRows() {
     if (!boardEl) return;
     const bw = boardEl.clientWidth || 1, loose = lookNow() === "loose";
-    const gap = loose ? 6 : 20, els = [...boardEl.querySelectorAll(".ci[data-row]")];
+    const gap = loose ? 2 : 10, els = [...boardEl.querySelectorAll(".ci[data-row]")];
     const tall = [];
     // row heights come from every photo in its Tidy up row, placed or not, so rows match what Tidy up makes
     boardEl.querySelectorAll(".ci[data-vrow]").forEach(el => { const r = +el.dataset.vrow; tall[r] = Math.max(tall[r] || 0, el.offsetHeight + (+el.dataset.drop || 0) * bw); });

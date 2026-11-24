@@ -145,7 +145,7 @@ export async function renderDay(opt) {
   groups.sort((a, b) => Math.abs(a.t - b.t) > 40 ? a.t - b.t : a.l - b.l); // page order
 
   // try 1–4 columns; keep the one where pictures come out biggest while everything fits the screen
-  const AW = W - 2 * M, AH = bottom - contentTop, gap = 16 * u, MAX = 3.2 * u;
+  const AW = W - 2 * M, AH = bottom - contentTop, gap = 8 * u, MAX = 3.2 * u;
   let plan = null;
   for (let c = 1; c <= Math.min(4, groups.length); c++) {
     const cellW = (AW - gap * (c - 1)) / c, rows = [];
@@ -170,6 +170,22 @@ export async function renderDay(opt) {
     });
     yy += rowH[ri] * f + gap;
   });
+
+  // the day's paper (kraft, grid notebook, black album) behind the photos and the note
+  const paper = opt.paper || "card";
+  if (paper !== "card") {
+    const px = 8 * u, py = contentTop - 14 * u, pw = W - 16 * u, phh = H - 20 * u - py;
+    ctx.save(); shadow(ctx, u, .8);
+    ctx.fillStyle = { kraft: "#C4A57A", grid: "#F3F1EA", album: "#23221F" }[paper] || PAPER;
+    ctx.fillRect(px, py, pw, phh); noShadow(ctx);
+    if (paper === "grid") {
+      ctx.strokeStyle = "rgba(80,110,150,.2)"; ctx.lineWidth = 1 * u; const step = 22 * u;
+      for (let gx = px; gx <= px + pw; gx += step) { ctx.beginPath(); ctx.moveTo(gx, py); ctx.lineTo(gx, py + phh); ctx.stroke(); }
+      for (let gy = py; gy <= py + phh; gy += step) { ctx.beginPath(); ctx.moveTo(px, gy); ctx.lineTo(px + pw, gy); ctx.stroke(); }
+    }
+    ctx.fillStyle = grainPattern(ctx, u * .6); ctx.fillRect(px, py, pw, phh);
+    ctx.restore();
+  }
 
   // pictures first
   const imgs = {};
@@ -239,7 +255,7 @@ function drawPhoto(ctx, g, el, img, p, s, opt) {
     const cx = cap.offsetLeft * s, cy = cap.offsetTop * s, cw = cap.offsetWidth * s;
     const timeEl = cap.querySelector(".time"); let ty = cy + 2 * s;
     const album = opt.paper === "album" && kind !== "instant";
-    if (timeEl) { ctx.font = `${12 * s}px "Special Elite", monospace`; ctx.fillStyle = album ? "#A9A79E" : PENCIL; ty += 12 * s; ctx.fillText(timeEl.textContent, cx + 4 * s, ty); ty += 4 * s; }
+    if (timeEl) { ctx.font = `${12 * s}px "Special Elite", monospace`; ctx.fillStyle = album ? "#A9A79E" : opt.paper === "kraft" && kind !== "instant" ? "#5E4B30" : PENCIL; ty += 12 * s; ctx.fillText(timeEl.textContent, cx + 4 * s, ty); ty += 4 * s; }
     if (p.caption) {
       const fs = Math.min(26, Math.max(16, g.w * .085)) * s;
       ctx.font = `${fs}px "Caveat", "Nanum Pen Script", sans-serif`; ctx.fillStyle = album ? "#EEEBE2" : INK;
