@@ -1,4 +1,4 @@
-export const VERSION = "8"; // bump on every change; shown at the bottom of Archive
+export const VERSION = "9"; // bump on every change; shown at the bottom of Archive
 // diary — app code. Loaded (and hot-swapped) by index.html.
 // mount(root, state) draws the app and returns an unmount function.
 
@@ -55,9 +55,14 @@ function makeStore(db) {
     t.onerror = () => rej(t.error);
   });
   return {
-    getNote: k => run("days", "readonly", t => t.objectStore("days").get(k)).then(d => d?.note || ""),
-    setNote: (k, note) => run("days", "readwrite", t =>
-      note ? t.objectStore("days").put({ date: k, note, updated: Date.now() }) : t.objectStore("days").delete(k)),
+    getDay: k => run("days", "readonly", t => t.objectStore("days").get(k)).then(d => d || { date: k }),
+    patchDay: (k, patch) => run("days", "readwrite", t => {
+      const s = t.objectStore("days");
+      s.get(k).onsuccess = e => {
+        const d = Object.assign(e.target.result || { date: k }, patch, { updated: Date.now() });
+        if (!d.note && !d.collage && !d.view) s.delete(k); else s.put(d);
+      };
+    }),
     photosOn: k => run("photos", "readonly", t => t.objectStore("photos").index("date").getAll(k))
       .then(a => a.sort((x, y) => x.added - y.added)),
     putPhoto: p => run("photos", "readwrite", t => t.objectStore("photos").put(p)),
@@ -136,7 +141,24 @@ function stampSVG(k) {
   return `<svg viewBox="-1 -1 ${x - 1} 20" fill="#FF7B22" aria-hidden="true"><g transform="skewX(-6) translate(1 0)">${parts.join("")}</g></svg>`;
 }
 
-const CAMERA = `<svg class="cam" viewBox="0 0 40 30" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M3 8.5h8l3-4.5h12l3 4.5h8v18H3z"/><circle cx="20" cy="16.5" r="6.2"/><circle cx="20" cy="16.5" r="2.4"/><path d="M31 12h3"/></svg>`;
+const ROUGH = `<filter id="rough" x="-10%" y="-10%" width="120%" height="120%"><feTurbulence type="fractalNoise" baseFrequency=".05" numOctaves="2" seed="3"/><feDisplacementMap in="SourceGraphic" scale="2.6"/></filter>`;
+const CAMERA = `<svg class="cam" viewBox="0 0 48 36" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><g filter="url(#rough)">
+  <path d="M5.2 11.6c3.6-.5 7.4-.1 9.5-.7l2.9-4.4c.5-.7 1.1-.9 1.8-.9l9.5.3c.7 0 1.2.4 1.6 1l2.6 4.1c3.5.3 6.7-.2 9.9.3.9.2 1.4.9 1.4 1.9l-.5 17.2c0 1-.7 1.6-1.7 1.7-12.7.5-25.3.1-37.9-.2-1 0-1.6-.8-1.6-1.8l-.6-16.7c0-.9.6-1.7 1.6-1.9z"/>
+  <path d="M24.4 14.3c4.3-.2 7.4 2.9 7.3 6.8-.1 4-3.4 6.9-7.4 6.8-4.2-.1-7.1-3.2-6.9-7.1.2-3.6 3-6.3 7-6.5z"/>
+  <path d="M22.6 13.8c5.1-.9 9.4 2.4 9.5 7" opacity=".55"/>
+  <path d="M24.2 18.1c1.7-.1 2.9 1.1 2.9 2.7 0 1.6-1.3 2.8-3 2.8-1.6 0-2.8-1.3-2.7-2.9.1-1.4 1.2-2.5 2.8-2.6z"/>
+  <path d="M36.8 15.4l3.5-.2"/><path d="M8.9 11l.3-2.4 3.5-.1.2 2.2"/>
+</g></svg>`;
+const STICKERS = {
+  star: { color: "#C08A26", path: "M30.5 6.5l6.2 15.2 16.6 1.6-12.8 10.6 4.4 16.4-14.6-9-14.3 9.3 3.9-16.6L7.4 23.5l16.8-1.4z" },
+  heart: { color: "#B9452E", path: "M30 50.5C14.5 40 7.2 31 8.6 22c1.3-8.3 10.8-11.4 16.6-6.3 2.3 2 3.9 4.5 4.9 7.3 1.5-3.6 3.6-6.8 7.1-8.5 6.6-3.2 13.9 1 14.2 8.8.4 9.4-7.9 17.6-21.4 27.2z" },
+  arrow: { color: "#2C2B27", path: "M8.5 41.5c9.5-11.8 24.6-19.6 41.4-20.4M50 21l-8.6-6.1M50 21l-6.2 8.6" },
+  circle: { color: "#2C2B27", path: "M30 9.2c13.2-.9 22.6 8.1 21.9 20.4-.8 12.8-11.8 21.6-24.1 20.8C15 49.7 7.6 40.4 8.3 28.6 9.1 17.4 18.2 9.9 33.4 10.6c5.1.3 9.2 2 12.3 4.6" },
+  sparkle: { color: "#C08A26", path: "M30 8.5c1.6 11.7 5.1 15.8 17.8 21.5-12.8 4.3-16.3 8.1-17.8 21.5-1.8-13.6-5.2-17.4-18-21.5 12.9-5.8 16.5-9.8 18-21.5z" },
+  squiggle: { color: "#2C2B27", path: "M5 32.5c5.8-6.2 10.1 6.1 15.9-.1s10.3 6.2 16.1 0 10.2 6.1 16-.1" },
+};
+const stickerSVG = k => `<svg viewBox="0 0 60 60" fill="none" stroke="${STICKERS[k].color}" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${STICKERS[k].path}" filter="url(#rough)"/></svg>`;
+const ROTATE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18.5 9.5a7 7 0 1 0 .8 5.6"/><path d="M19 4.5v5h-5"/></svg>`;
 
 // ---------- backup bookkeeping ----------
 const blobToData = b => new Promise(r => { const f = new FileReader(); f.onload = () => r(f.result); f.readAsDataURL(b); });
@@ -223,7 +245,7 @@ export async function mount(root, state) {
       for (const name of have) if (/^\d{4}-\d{2}-\d{2}_[a-z0-9-]+\.jpg$/.test(name) && !want.has(name)) await pdir.removeEntry(name);
       const index = {
         app: "diary", version: 3, saved: new Date().toISOString(),
-        days: days.map(d => ({ date: d.date, note: d.note, updated: d.updated })),
+        days: days.map(d => ({ date: d.date, note: d.note, view: d.view, collage: d.collage, updated: d.updated })),
         photos: photos.map(p => ({ id: p.id, date: p.date, added: p.added, caption: p.caption || "", file: `photos/${photoFile(p)}` })),
       };
       const w = await (await dir.getFileHandle("diary.json", { create: true })).createWritable();
@@ -273,6 +295,11 @@ export async function mount(root, state) {
     textTimer = setTimeout(flushText, 600);
   };
 
+  // shared pencil-wobble filter for drawn icons and stickers
+  const defsEl = document.createElement("div");
+  defsEl.innerHTML = `<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs>${ROUGH}</defs></svg>`;
+  document.body.append(defsEl);
+
   // hidden inputs
   const mkInput = (props) => { const i = Object.assign(document.createElement("input"), { type: "file", className: "sr", tabIndex: -1, ...props }); document.body.append(i); return i; };
   const cameraInput = mkInput({ accept: "image/*" });
@@ -312,8 +339,10 @@ export async function mount(root, state) {
   // ---------- day page ----------
   async function renderDay(k) {
     const d = fromKey(k), isToday = k === todayKey();
-    const [photos, note] = await Promise.all([store.photosOn(k), store.getNote(k)]);
+    const [photos, day] = await Promise.all([store.photosOn(k), store.getDay(k)]);
+    const note = day.note || "";
     dayPhotos = photos;
+    const view = day.view || "grid";
     const title = isToday
       ? `<span class="soft">Today,</span> ${d.getDate()} ${MONTHS[d.getMonth()]}`
       : `<span class="soft">${WEEKDAYS[d.getDay()]},</span> ${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
@@ -345,19 +374,190 @@ export async function mount(root, state) {
           <a class="link" href="#/archive">${isToday ? "Archive" : "Back to archive"}</a>
         </header>
         <h1 class="page-title day-title">${title}</h1>
-        <div class="roll">${prints}${add}</div>
+        <div class="viewbar">
+          ${state.decorating ? "" : `
+          <button class="link ${view === "grid" ? "on" : ""}" data-view="grid" aria-pressed="${view === "grid"}">Grid</button>
+          <button class="link ${view === "collage" ? "on" : ""}" data-view="collage" aria-pressed="${view === "collage"}">Collage</button>
+          ${view === "collage" ? `<span class="spacer"></span><button class="link" data-decorate>Decorate</button><button class="link" data-camera>${touch() ? "Take a photo" : "Add photos"}</button>` : ""}`}
+        </div>
+        ${view === "collage" ? `<div class="board ${state.decorating ? "editing" : ""}" id="board"></div>` : `<div class="roll">${prints}${add}</div>`}
         <div class="slip">
           <span class="tape" aria-hidden="true"></span>
           <label class="sr" for="note">About the day</label>
           <textarea class="note" id="note" rows="3" placeholder="how was today?">${esc(note)}</textarea>
         </div>
-        ${backupLine()}
-      </div>`;
+        ${state.decorating ? "" : backupLine()}
+      </div>
+      ${state.decorating && view === "collage" ? decoBar() : ""}`;
+    root.querySelector(".wrap").classList.toggle("decorating", !!state.decorating && view === "collage");
 
+    if (view === "collage") await mountBoard(k, day, photos);
+    else { state.decorating = false; teardownBoard(); }
     root.querySelectorAll("textarea").forEach(grow);
     window.scrollTo(0, state.scroll?.[location.hash] || 0);
   }
   const grow = ta => { ta.style.height = "auto"; ta.style.height = ta.scrollHeight + "px"; };
+
+  // ---------- collage ----------
+  let col = null, colKey = null, boardEl = null, ro = null, selectedId = null, drag = null, colTimer = null;
+  const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+  const topZ = () => Math.max(0, ...col.items.map(i => i.z || 0));
+  const byPhoto = () => Object.fromEntries(dayPhotos.map(p => [p.id, p]));
+
+  function placePhotos(items, photos) {
+    const have = new Set(items.filter(i => i.kind === "photo").map(i => i.ref));
+    const ids = new Set(photos.map(p => p.id));
+    let added = false;
+    items = items.filter(i => i.kind !== "photo" || ids.has(i.ref));
+    let n = items.filter(i => i.kind === "photo").length;
+    const small = root.clientWidth < 640, cols = small ? 2 : 3, w = small ? .44 : .27;
+    for (const p of photos) if (!have.has(p.id)) {
+      const c = n % cols, r = Math.floor(n / cols), j = ((n * 37) % 11 - 5) / 100;
+      items.push({ id: newId(), kind: "photo", ref: p.id, x: .03 + c * (.94 / cols) + j * .4, y: .05 + r * w * 1.42 + Math.abs(j) * .5,
+        w, rot: ((n * 53) % 9 - 4) * 1.1, z: n + 1 });
+      n++; added = true;
+    }
+    return { items, added };
+  }
+
+  const pos = i => `left:calc(var(--bw) * ${i.x});top:calc(var(--bw) * ${i.y});width:calc(var(--bw) * ${i.w});transform:rotate(${i.rot}deg);z-index:${i.z || 1}`;
+  function itemHTML(i, photos) {
+    let inner = "";
+    if (i.kind === "photo") {
+      const p = photos[i.ref];
+      inner = `<span class="tape" aria-hidden="true"></span>
+        <div class="frame"${state.decorating ? "" : ` data-open="${p.id}" role="button" tabindex="0" aria-label="Open photo"`}>
+          <span class="photo"><img src="${url(p.blob)}" alt="" draggable="false" class="${developIds.has(p.id) ? "developing" : ""}"><span class="stamp">${stampSVG(p.date)}</span></span>
+        </div>${p.caption ? `<p class="ccap">${esc(p.caption)}</p>` : ""}`;
+    } else if (i.kind === "text") {
+      inner = `<div class="ctext" style="font-size:calc(var(--bw) * ${i.fs})" spellcheck="false">${esc(i.text)}</div>`;
+    } else if (i.kind === "tape") {
+      inner = `<span class="ctape"></span>`;
+    } else if (i.kind === "sticker") {
+      inner = `<span class="csticker">${stickerSVG(i.shape)}</span>`;
+    }
+    const handles = state.decorating ? `<span class="h-rot" data-h="t" title="Turn and resize">${ROTATE_ICON}</span>${i.kind !== "photo" ? `<button class="h-del" data-h="d" aria-label="Remove">×</button>` : ""}` : "";
+    return `<div class="ci ci-${i.kind}${i.id === selectedId ? " sel" : ""}" data-id="${i.id}" style="${pos(i)}">${inner}${handles}</div>`;
+  }
+
+  async function mountBoard(k, day, photos) {
+    teardownBoard();
+    boardEl = root.querySelector("#board");
+    colKey = k;
+    const placed = placePhotos(day.collage?.items ? structuredClone(day.collage.items) : [], photos);
+    col = { items: placed.items };
+    if (placed.added || !day.collage) saveCollage(true);
+    const setBW = () => { boardEl.style.setProperty("--bw", boardEl.clientWidth + "px"); fitBoard(); };
+    const pm = byPhoto();
+    boardEl.innerHTML = col.items.map(i => itemHTML(i, pm)).join("") + (state.decorating ? "" : (photos.length ? "" : `<p class="board-empty">Add a photo to start.</p>`));
+    setBW();
+    ro = new ResizeObserver(setBW); ro.observe(boardEl);
+    developIds = new Set();
+    if (state.decorating) {
+      boardEl.addEventListener("pointerdown", onDown);
+      boardEl.addEventListener("pointermove", onMove);
+      boardEl.addEventListener("pointerup", onUp);
+      boardEl.addEventListener("pointercancel", onUp);
+    }
+  }
+  function teardownBoard() { if (ro) { ro.disconnect(); ro = null; } boardEl = null; }
+
+  function fitBoard() {
+    if (!boardEl) return;
+    let max = 0;
+    boardEl.querySelectorAll(".ci").forEach(el => { max = Math.max(max, el.offsetTop + el.offsetHeight); });
+    boardEl.style.height = Math.max(max + 48, boardEl.clientWidth * (state.decorating ? 1.1 : .5)) + "px";
+  }
+  function saveCollage(now = false) {
+    clearTimeout(colTimer);
+    const k = colKey, items = structuredClone(col.items);
+    const go = async () => { await store.patchDay(k, { collage: { items } }); changed(); };
+    if (now) go(); else colTimer = setTimeout(go, 400);
+  }
+  function applyPos(el, i) {
+    el.style.left = `calc(var(--bw) * ${i.x})`; el.style.top = `calc(var(--bw) * ${i.y})`;
+    el.style.width = `calc(var(--bw) * ${i.w})`; el.style.transform = `rotate(${i.rot}deg)`; el.style.zIndex = i.z;
+    const t = el.querySelector(".ctext"); if (t && i.fs) t.style.fontSize = `calc(var(--bw) * ${i.fs})`;
+  }
+  function select(id) {
+    selectedId = id;
+    boardEl?.querySelectorAll(".ci").forEach(el => el.classList.toggle("sel", el.dataset.id === id));
+  }
+  function removeItem(id) {
+    col.items = col.items.filter(i => i.id !== id);
+    boardEl.querySelector(`.ci[data-id="${id}"]`)?.remove();
+    select(null); fitBoard(); saveCollage();
+  }
+  function addItem(kind, extra = {}) {
+    const bw = boardEl.clientWidth, top = boardEl.getBoundingClientRect().top;
+    const cy = clamp((innerHeight * .4 - top) / bw, .04, boardEl.clientHeight / bw);
+    const base = { id: newId(), kind, rot: (Math.random() * 10 - 5), z: topZ() + 1 };
+    const it = kind === "text" ? { ...base, x: .2, y: cy, w: .5, fs: .06, text: "" }
+      : kind === "tape" ? { ...base, x: .3, y: cy, w: .3 }
+      : { ...base, x: .38, y: cy, w: .2, ...extra };
+    col.items.push(it);
+    boardEl.insertAdjacentHTML("beforeend", itemHTML(it, byPhoto()));
+    select(it.id); fitBoard(); saveCollage();
+    if (kind === "text") startTextEdit(boardEl.querySelector(`.ci[data-id="${it.id}"]`), it);
+  }
+  function startTextEdit(el, it) {
+    const t = el.querySelector(".ctext");
+    t.contentEditable = "true"; t.focus();
+    const r = document.createRange(); r.selectNodeContents(t); r.collapse(false);
+    const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
+    t.oninput = () => { it.text = t.innerText; fitBoard(); saveCollage(); };
+    t.onblur = () => { t.contentEditable = "false"; if (!it.text.trim()) removeItem(it.id); };
+  }
+
+  function onDown(e) {
+    const el = e.target.closest(".ci");
+    if (e.target.closest(".h-del")) { e.preventDefault(); removeItem(el.dataset.id); return; }
+    if (!el) { document.activeElement?.blur?.(); select(null); return; }
+    const t = el.querySelector(".ctext");
+    if (t && t.isContentEditable && e.target.closest(".ctext")) return; // typing in it
+    e.preventDefault();
+    const it = col.items.find(i => i.id === el.dataset.id);
+    const wasSel = selectedId === it.id;
+    select(it.id);
+    it.z = topZ() + 1; el.style.zIndex = it.z;
+    if (e.target.closest(".h-rot")) {
+      const r = el.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+      drag = { mode: "t", it, el, cx, cy, a0: Math.atan2(e.clientY - cy, e.clientX - cx), d0: Math.max(10, Math.hypot(e.clientX - cx, e.clientY - cy)), rot0: it.rot, w0: it.w, fs0: it.fs };
+    } else {
+      drag = { mode: "m", it, el, sx: e.clientX, sy: e.clientY, x0: it.x, y0: it.y, bw: boardEl.clientWidth, moved: false, wasSel };
+    }
+    boardEl.setPointerCapture(e.pointerId);
+  }
+  function onMove(e) {
+    if (!drag) return;
+    const { it, el } = drag;
+    if (drag.mode === "m") {
+      const dx = (e.clientX - drag.sx) / drag.bw, dy = (e.clientY - drag.sy) / drag.bw;
+      if (Math.abs(dx) + Math.abs(dy) > .008) drag.moved = true;
+      it.x = clamp(drag.x0 + dx, -.15, .95); it.y = Math.max(-.05, drag.y0 + dy);
+    } else {
+      const a = Math.atan2(e.clientY - drag.cy, e.clientX - drag.cx), d = Math.hypot(e.clientX - drag.cx, e.clientY - drag.cy);
+      it.rot = drag.rot0 + (a - drag.a0) * 180 / Math.PI;
+      it.w = clamp(drag.w0 * d / drag.d0, .06, 1.1);
+      if (drag.fs0) it.fs = drag.fs0 * it.w / drag.w0;
+    }
+    applyPos(el, it);
+  }
+  function onUp() {
+    if (!drag) return;
+    const d = drag; drag = null;
+    if (d.mode === "m" && !d.moved && d.wasSel && d.it.kind === "text") startTextEdit(d.el, d.it);
+    fitBoard(); saveCollage();
+  }
+
+  function decoBar() {
+    return `<div class="decobar" role="toolbar" aria-label="Decorate">
+      <button data-deco="text">Text</button>
+      <button data-deco="tape" aria-label="Tape"><span class="tape-swatch"></span></button>
+      ${Object.keys(STICKERS).map(k => `<button data-deco="sticker" data-shape="${k}" aria-label="${k}">${stickerSVG(k)}</button>`).join("")}
+      <button class="done" data-deco="done">Done</button>
+    </div>`;
+  }
 
   // ---------- archive page ----------
   async function renderArchive() {
@@ -383,7 +583,7 @@ export async function mount(root, state) {
       }
       months += `
         <section class="month">
-          <h2 class="press">${MONTHS[m]} ${y}${n ? `<span class="count">${n} of ${daysIn} days</span>` : ""}</h2>
+          <h2 class="month-title">${MONTHS[m]} ${y}${n ? `<span class="count">${n} of ${daysIn} days</span>` : ""}</h2>
           <div class="weekdays" aria-hidden="true"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>
           <div class="grid">${cells}</div>
         </section>`;
@@ -412,7 +612,7 @@ export async function mount(root, state) {
           <a class="wordmark press" href="#/">diary</a>
           <a class="link" href="#/">Today</a>
         </header>
-        <h1 class="page-title press">Archive</h1>
+        <h1 class="page-title day-title">Archive</h1>
         <p class="summary">${photoTotal ? `${photoTotal} photo${photoTotal > 1 ? "s" : ""} over ${dates.length} day${dates.length > 1 ? "s" : ""}` : "Nothing here yet."}</p>
         <div class="months">${months}</div>
         <details class="fonts" ${state.fontsOpen ? "open" : ""}>
@@ -521,7 +721,7 @@ export async function mount(root, state) {
   }
 
   async function restoreRecords(days, photos) {
-    for (const d of days) if (d.note) await store.setNote(d.date, d.note);
+    for (const d of days) await store.patchDay(d.date, { note: d.note || "", ...(d.collage ? { collage: d.collage } : {}), ...(d.view ? { view: d.view } : {}) });
     for (const p of photos) await store.putPhoto(p); // same id = same photo, nothing doubles
     changed();
     alert(`Restored ${photos.length} photo${photos.length === 1 ? "" : "s"}.`);
@@ -565,7 +765,7 @@ export async function mount(root, state) {
 
   // ---------- events (all removed on unmount) ----------
   on(document, "click", async e => {
-    const t = e.target.closest("[data-camera],[data-library],[data-open],[data-close],[data-step],[data-delete],[data-export],[data-import],[data-folder],[data-resume],[data-stopfolder],[data-importfolder],[data-font]");
+    const t = e.target.closest("[data-camera],[data-library],[data-open],[data-close],[data-step],[data-delete],[data-export],[data-import],[data-folder],[data-resume],[data-stopfolder],[data-importfolder],[data-font],[data-view],[data-decorate],[data-deco]");
     if (!t) { if (viewerEl && e.target.classList?.contains("stage")) closeViewer(); return; }
     const has = a => t.hasAttribute(a);
     if (has("data-camera")) { (touch() ? cameraInput : libraryInput).value = ""; (touch() ? cameraInput : libraryInput).click(); }
@@ -575,6 +775,17 @@ export async function mount(root, state) {
     else if (t.dataset.step) step(Number(t.dataset.step));
     else if (has("data-export")) exportBackup();
     else if (has("data-import")) { importInput.value = ""; importInput.click(); }
+    else if (t.dataset.view) {
+      await store.patchDay(route().date, { view: t.dataset.view });
+      changed(); render();
+    }
+    else if (has("data-decorate")) { state.decorating = true; selectedId = null; render(); }
+    else if (t.dataset.deco) {
+      const a = t.dataset.deco;
+      if (a === "done") { document.activeElement?.blur?.(); clearTimeout(colTimer); if (col) await store.patchDay(colKey, { collage: { items: col.items } }); state.decorating = false; selectedId = null; changed(); render(); }
+      else if (a === "sticker") addItem("sticker", { shape: t.dataset.shape });
+      else addItem(a);
+    }
     else if (t.dataset.font) {
       const lang = t.dataset.lang;
       try { localStorage.setItem(`diary.hand.${lang}`, t.dataset.font); } catch {}
@@ -605,16 +816,20 @@ export async function mount(root, state) {
   on(document, "input", e => {
     const t = e.target;
     if (t.matches?.(".caption")) { grow(t); const id = t.dataset.cap, v = t.value; queueText(`cap:${id}`, () => store.setCaption(id, v)); }
-    else if (t.id === "note") { grow(t); const k = route().date, v = t.value; queueText(`note:${k}`, () => store.setNote(k, v)); }
+    else if (t.id === "note") { grow(t); const k = route().date, v = t.value; queueText(`note:${k}`, () => store.patchDay(k, { note: v })); }
   });
   on(cameraInput, "change", () => cameraInput.files.length && addFiles([...cameraInput.files]));
   on(libraryInput, "change", () => libraryInput.files.length && addFiles([...libraryInput.files]));
   on(importInput, "change", () => importInput.files[0] && importBackup(importInput.files[0]));
   on(document, "toggle", e => { if (e.target.matches?.(".fonts")) state.fontsOpen = e.target.open; }, { capture: true });
-  on(window, "hashchange", () => { closeViewer(); render(); });
+  on(window, "hashchange", () => { closeViewer(); state.decorating = false; render(); });
   on(window, "scroll", () => { (state.scroll ||= {})[location.hash] = window.scrollY; }, { passive: true });
   on(window, "pagehide", () => flushText());
   on(document, "keydown", e => {
+    if (!viewerEl && (e.key === "Enter" || e.key === " ") && e.target.matches?.(".ci .frame[data-open]")) { e.preventDefault(); openViewer(e.target.dataset.open); return; }
+    if (state.decorating && selectedId && (e.key === "Delete" || e.key === "Backspace") && !document.activeElement?.isContentEditable) {
+      const it = col?.items.find(i => i.id === selectedId); if (it && it.kind !== "photo") removeItem(it.id);
+    }
     if (!viewerEl) return;
     if (e.key === "Escape") closeViewer();
     else if (e.key === "ArrowLeft") step(-1);
@@ -630,6 +845,9 @@ export async function mount(root, state) {
 
   return async function unmount() {
     await flushText();
+    if (col && colTimer) { clearTimeout(colTimer); await store.patchDay(colKey, { collage: { items: col.items } }); }
+    teardownBoard();
+    defsEl.remove();
     clearTimeout(syncTimer);
     ctl.abort();
     revoke();
