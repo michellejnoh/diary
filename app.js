@@ -1,4 +1,4 @@
-export const VERSION = "12"; // bump on every change; shown at the bottom of Archive
+export const VERSION = "13"; // bump on every change; shown at the bottom of Archive
 // diary — app code. Loaded (and hot-swapped) by index.html.
 // mount(root, state) draws the app and returns an unmount function.
 
@@ -158,6 +158,7 @@ const CAMERA = `<svg class="cam" viewBox="0 0 48 36" aria-hidden="true" fill="no
   <path d="M24.2 18.1c1.7-.1 2.9 1.1 2.9 2.7 0 1.6-1.3 2.8-3 2.8-1.6 0-2.8-1.3-2.7-2.9.1-1.4 1.2-2.5 2.8-2.6z"/>
   <path d="M36.8 15.4l3.5-.2"/><path d="M8.9 11l.3-2.4 3.5-.1.2 2.2"/>
 </g></svg>`;
+const PENCIL_LOOP = `<svg viewBox="0 0 120 50" preserveAspectRatio="none" aria-hidden="true"><path d="M14 30C9 16 34 6 64 6c28 0 49 7 49 20 0 14-26 21-56 21C27 47 6 39 8 25 10 14 33 9 52 8" fill="none" stroke="#2C2B27" stroke-width="1.5" stroke-linecap="round" filter="url(#rough)" opacity=".85"/></svg>`;
 const ROTATE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18.5 9.5a7 7 0 1 0 .8 5.6"/><path d="M19 4.5v5h-5"/></svg>`;
 
 // ---------- backup bookkeeping ----------
@@ -365,7 +366,7 @@ export async function mount(root, state) {
     root.innerHTML = `
       <div class="wrap${editing ? " decorating" : ""}${slide}">
         <header class="top">
-          <a class="wordmark" href="#/">Diary</a>
+          <a class="wordmark press" href="#/">Diary</a>
           <a class="navtag" href="#/archive">Archive</a>
         </header>
         <div class="dayhead">
@@ -374,7 +375,7 @@ export async function mount(root, state) {
             <h1 class="page-title day-title">${title}</h1>
             ${editing || isToday ? "" : `<a class="daynav" href="${hrefOf(nextK)}" data-nav="next" aria-label="Next day">›</a>`}
           </div>
-          ${editing ? `<span class="hint typed">Drag to move. Corner handle turns and resizes.</span>` : `<button class="navtag tag-b" data-decorate>Decorate</button>`}
+          ${editing ? `<span class="hint typed">Drag to move. Corner handle turns and resizes.</span>` : `<button class="pencilbtn" data-decorate>Decorate${PENCIL_LOOP}</button>`}
         </div>
         <div class="board paper-${paper}${editing ? " editing" : ""}" id="board"></div>
         <div class="slip">
@@ -813,7 +814,7 @@ export async function mount(root, state) {
     root.innerHTML = `
       <div class="wrap">
         <header class="top">
-          <a class="wordmark" href="#/">Diary</a>
+          <a class="wordmark press" href="#/">Diary</a>
           <a class="navtag" href="#/">Today</a>
         </header>
         <h1 class="page-title day-title">Archive</h1>
