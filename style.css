@@ -558,3 +558,9 @@ header.top { padding-bottom: 12px; }
 .daysub { padding-left: 0; }
 
 
+
+/* long dates: the date may wrap onto two lines; the buttons never squeeze */
+.daterow .page-title.day-title.big-date { white-space: normal; min-width: 0; flex: 0 1 auto; }
+.dayactions { flex: none; white-space: nowrap; }
+.daterow .daynav { flex: none; }
+.day-title .nw { white-space: nowrap; }

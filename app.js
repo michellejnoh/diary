@@ -1,4 +1,4 @@
-export const VERSION = "43"; // bump on every change; shown at the bottom of Archive
+export const VERSION = "44"; // bump on every change; shown at the bottom of Archive
 // diary — app code. Loaded (and hot-swapped) by index.html.
 // mount(root, state) draws the app and returns an unmount function.
 
@@ -444,7 +444,7 @@ export async function mount(root, state) {
     const paper = day.paper || "card";
     const title = isToday
       ? `<span class="soft">Today,</span> ${d.getDate()} ${MONTHS[d.getMonth()]}`
-      : `<span class="soft">${WEEKDAYS[d.getDay()]},</span> ${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+      : `<span class="soft">${WEEKDAYS[d.getDay()]},</span> <span class="nw">${d.getDate()} ${MONTHS[d.getMonth()]}${d.getFullYear() !== new Date().getFullYear() ? " " + d.getFullYear() : ""}</span>`;
 
     root.innerHTML = `
       <div class="wrap${editing ? " decorating" : ""}">
