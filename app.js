@@ -1,4 +1,4 @@
-export const VERSION = "42"; // bump on every change; shown at the bottom of Archive
+export const VERSION = "43"; // bump on every change; shown at the bottom of Archive
 // diary — app code. Loaded (and hot-swapped) by index.html.
 // mount(root, state) draws the app and returns an unmount function.
 
@@ -1018,19 +1018,18 @@ export async function mount(root, state) {
   // ---------- save the day as a picture ----------
   async function saveImage(btn) {
     const label = btn.textContent; btn.textContent = "Saving…"; btn.disabled = true;
-    const wrap = root.querySelector(".wrap");
-    root.classList.add("exporting");
     try {
       await flushText();
-      await document.fonts?.ready;
-      const { toBlob } = await import("./vendor/html-to-image.js");
-      const skip = el => !(el.classList && (el.matches(".dayactions, .daynav, .navtag, .nudge, .ci-add, .h-rot, .h-del")));
-      const blob = await toBlob(wrap, {
-        pixelRatio: Math.min(3, Math.max(2, devicePixelRatio || 2)),
-        backgroundColor: CARD, filter: skip, cacheBust: false,
-        style: { margin: "0", paddingBottom: "28px" },
+      const k = route().date, d = fromKey(k), isToday = k === todayKey();
+      const { renderDay } = await import(`./render.js?v=${VERSION}`);
+      const cv = await renderDay({
+        boardEl, items: col.items, photos: photoMap(), assets, note: root.querySelector("#note")?.value || "",
+        titleSoft: isToday ? "Today," : `${WEEKDAYS[d.getDay()]},`,
+        titleMain: `${d.getDate()} ${MONTHS[d.getMonth()]}${isToday || d.getFullYear() === new Date().getFullYear() ? "" : " " + d.getFullYear()}`,
+        colors: COLORS, paper: curPaper(),
       });
-      const name = `diary-${route().date}.png`;
+      const blob = await new Promise(r => cv.toBlob(r, "image/png"));
+      const name = `diary-${k}.png`;
       const file = new File([blob], name, { type: "image/png" });
       if (touch() && navigator.canShare?.({ files: [file] })) {
         await navigator.share({ files: [file] }); // choose "Save Image" to put it in Photos
@@ -1042,7 +1041,7 @@ export async function mount(root, state) {
       }
     } catch (err) {
       if (err?.name !== "AbortError") { console.error(err); alert("The picture couldn’t be made. Try again."); }
-    } finally { root.classList.remove("exporting"); btn.textContent = label; btn.disabled = false; }
+    } finally { btn.textContent = label; btn.disabled = false; }
   }
 
   // ---------- archive page ----------
