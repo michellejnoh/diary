@@ -1,14 +1,15 @@
-@import url("https://fonts.googleapis.com/css2?family=Special+Elite&display=swap");
-
-/* Korean handwriting: full fonts hosted here, so typing never falls back to another font */
-@font-face { font-family: "Nanum Pen Script"; src: url("fonts/nanumpenscript.woff2") format("woff2"); font-display: swap; }
-@font-face { font-family: "Gaegu"; src: url("fonts/gaegu.woff2") format("woff2"); font-display: swap; }
-@font-face { font-family: "Gamja Flower"; src: url("fonts/gamjaflower.woff2") format("woff2"); font-display: swap; }
-@font-face { font-family: "Hi Melody"; src: url("fonts/himelody.woff2") format("woff2"); font-display: swap; }
-@font-face { font-family: "Poor Story"; src: url("fonts/poorstory.woff2") format("woff2"); font-display: swap; }
-@font-face { font-family: "Yeon Sung"; src: url("fonts/yeonsung.woff2") format("woff2"); font-display: swap; }
-@font-face { font-family: "Gowun Batang"; src: url("fonts/gowunbatang.woff2") format("woff2"); font-display: swap; }
-
+/* All fonts live in /fonts. Korean files hold every Hangul syllable, so typing never flashes another font.
+   size-adjust makes every font look the same size, so Korean and English sit evenly on one line. */
+@font-face { font-family: "Nanum Pen Script"; src: url("fonts/nanumpenscript.woff2") format("woff2"); size-adjust: 128%; font-display: swap; }
+@font-face { font-family: "Gaegu"; src: url("fonts/gaegu.woff2") format("woff2"); size-adjust: 108%; font-display: swap; }
+@font-face { font-family: "Poor Story"; src: url("fonts/poorstory.woff2") format("woff2"); size-adjust: 104%; font-display: swap; }
+@font-face { font-family: "Gowun Batang"; src: url("fonts/gowunbatang.woff2") format("woff2"); size-adjust: 86%; font-display: swap; }
+@font-face { font-family: "Caveat"; src: url("fonts/caveat.woff2") format("woff2"); size-adjust: 118%; font-display: swap; unicode-range: U+0000-00FF, U+2010-205E, U+20AC; }
+@font-face { font-family: "Patrick Hand"; src: url("fonts/patrickhand.woff2") format("woff2"); size-adjust: 100%; font-display: swap; unicode-range: U+0000-00FF, U+2010-205E, U+20AC; }
+@font-face { font-family: "Indie Flower"; src: url("fonts/indieflower.woff2") format("woff2"); size-adjust: 92%; font-display: swap; unicode-range: U+0000-00FF, U+2010-205E, U+20AC; }
+@font-face { font-family: "EB Garamond"; src: url("fonts/ebgaramond.woff2") format("woff2"); size-adjust: 100%; font-display: swap; unicode-range: U+0000-00FF, U+2010-205E, U+20AC; }
+@font-face { font-family: "IM Fell English"; src: url("fonts/imfell.woff2") format("woff2"); font-display: swap; }
+@font-face { font-family: "Special Elite"; src: url("fonts/specialelite.woff2") format("woff2"); font-display: swap; }
 
 :root {
   --card: #D5D7CE;      /* grey album card */
@@ -19,18 +20,14 @@
   --stamp: #FF7B22;     /* film date imprint */
   --tape: rgba(233, 225, 199, .78);
   --type: "Special Elite", "Courier New", monospace;          /* typewriter: dates, buttons */
-  --hand: "Nanum Pen Script", "Apple SD Gothic Neo", sans-serif; /* pen: everything you write */
-  --hs: 1; /* size fix per font */
+  --hand: "Caveat", "Nanum Pen Script", "Apple SD Gothic Neo", sans-serif; /* pen: everything you write (set by the font picker) */
+  --press: "IM Fell English", Georgia, serif;                 /* letterpress: titles */
+  /* worn ink: speckles where the type didn't take ink */
+  --ink-wear: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='w'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.7' numOctaves='2' seed='4'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -2.6 2.15'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23w)'/%3E%3C/svg%3E");
+  --ink-wear-fine: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='w'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.4' numOctaves='1' seed='9'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -2.2 2.0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23w)'/%3E%3C/svg%3E");
   --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .17 0 0 0 0 .17 0 0 0 0 .15 0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   --mottle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='600'%3E%3Cfilter id='m'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.012' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .25 0 0 0 0 .25 0 0 0 0 .22 0 0 0 .22 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23m)'/%3E%3C/svg%3E");
 }
-html[data-hand="nanumpenscript"] { --hand: "Nanum Pen Script", "Apple SD Gothic Neo", sans-serif; --hs: 1; }
-html[data-hand="gaegu"] { --hand: "Gaegu", "Apple SD Gothic Neo", sans-serif; --hs: 0.86; }
-html[data-hand="gamjaflower"] { --hand: "Gamja Flower", "Apple SD Gothic Neo", sans-serif; --hs: 0.9; }
-html[data-hand="himelody"] { --hand: "Hi Melody", "Apple SD Gothic Neo", sans-serif; --hs: 0.9; }
-html[data-hand="poorstory"] { --hand: "Poor Story", "Apple SD Gothic Neo", sans-serif; --hs: 0.8; }
-html[data-hand="yeonsung"] { --hand: "Yeon Sung", "Apple SD Gothic Neo", sans-serif; --hs: 0.84; }
-html[data-hand="gowunbatang"] { --hand: "Gowun Batang", "Apple SD Gothic Neo", sans-serif; --hs: 0.66; }
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; background-color: var(--card); }
 body {
@@ -46,12 +43,23 @@ body {
 button, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
 a { color: inherit; }
+/* typewriter: uneven ink on small type */
+.typed, .link, .time, .summary, .nudge, .weekdays, .cell .n, .add-tile span, .keep, .fonts summary, .font-opt .name, .viewer .pager span {
+  text-shadow: 0 0 .5px currentColor, .3px .2px 0 rgba(44,43,39,.18);
+  -webkit-mask-image: var(--ink-wear-fine); mask-image: var(--ink-wear-fine); -webkit-mask-size: 120px; mask-size: 120px;
+}
 :focus-visible { outline: 2px dashed var(--ink); outline-offset: 3px; }
 
 .wrap { max-width: 1100px; margin: 0 auto; padding: 22px 18px 64px; }
 
 header.top { display: flex; align-items: baseline; justify-content: space-between; padding: 4px 0 26px; }
-.wordmark { font: 400 calc(38px * var(--hs)) / 1 var(--hand); margin: 0; text-decoration: none; }
+/* letterpress: inked metal type pressed into the card */
+.press {
+  font-family: var(--press); color: #26251F;
+  text-shadow: 0 1px 0 rgba(255,255,255,.55), 0 -1px 0 rgba(0,0,0,.12), 0 0 .6px rgba(38,37,31,.6);
+  -webkit-mask-image: var(--ink-wear); mask-image: var(--ink-wear); -webkit-mask-size: 160px; mask-size: 160px;
+}
+.wordmark { font-size: 44px; line-height: 1; margin: 0; text-decoration: none; letter-spacing: -.01em; }
 .link {
   background: none; border: 0; padding: 6px 0; color: var(--pencil); font: 400 15px/1.4 var(--type);
   text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px;
@@ -59,8 +67,8 @@ header.top { display: flex; align-items: baseline; justify-content: space-betwee
 .link.small { font-size: 13px; }
 .link.danger-armed { color: #A3341B; }
 
-.page-title { margin: 0 0 30px; font: 400 23px/1.3 var(--type); }
-.page-title .soft { color: var(--pencil); }
+.page-title { margin: 0 0 30px; font-size: 30px; font-weight: 400; line-height: 1.2; }
+.page-title .soft { opacity: .62; }
 
 /* ---------- the day's roll ---------- */
 .roll {
@@ -109,7 +117,7 @@ header.top { display: flex; align-items: baseline; justify-content: space-betwee
 .print .time { display: block; color: var(--pencil); font: 400 12px/1.2 var(--type); margin-bottom: 1px; }
 .caption {
   display: block; width: 100%; border: 0; padding: 0; background: transparent; resize: none; overflow: hidden;
-  font: 400 calc(25px * var(--hs)) / 1.2 var(--hand); color: var(--ink); min-height: 1.2em;
+  font: 400 19px/1.25 var(--hand); color: var(--ink); min-height: 1.2em;
 }
 .caption::placeholder { color: var(--pencil); opacity: .55; }
 .caption:focus-visible { outline: none; }
@@ -136,7 +144,7 @@ header.top { display: flex; align-items: baseline; justify-content: space-betwee
 .note {
   position: relative; z-index: 1;
   display: block; width: 100%; padding: 0; border: 0; resize: none; overflow: hidden;
-  font: 400 calc(26px * var(--hs)) / 34px var(--hand); min-height: 102px;
+  font: 400 21px/34px var(--hand); min-height: 102px;
   background: transparent;
   background-image: linear-gradient(to bottom, transparent 33px, rgba(80,110,150,.28) 33px);
   background-size: 100% 34px; background-attachment: local;
@@ -151,7 +159,8 @@ header.top { display: flex; align-items: baseline; justify-content: space-betwee
 .summary { color: var(--pencil); margin: -18px 0 32px; font-size: 15px; }
 .months { display: grid; gap: 44px; }
 @media (min-width: 900px) { .months { grid-template-columns: repeat(2, 1fr); gap: 48px 64px; } }
-.month h2 { margin: 0 0 12px; font: 400 18px/1.3 var(--type); }
+.month h2 { margin: 0 0 12px; font-size: 22px; font-weight: 400; line-height: 1.3; }
+.month h2 .count { font-family: var(--type); }
 .month h2 .count { color: var(--pencil); font-size: 13px; margin-left: 10px; }
 .weekdays, .grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
 .weekdays { margin-bottom: 6px; color: var(--pencil); font-size: 12px; text-align: center; }
@@ -177,13 +186,15 @@ header.top { display: flex; align-items: baseline; justify-content: space-betwee
 .fonts summary { cursor: pointer; font-size: 15px; color: var(--pencil); padding: 6px 0; width: max-content; }
 .fonts summary span { color: var(--ink); }
 .fonts[open] summary { margin-bottom: 12px; }
+.font-group { margin: 0 0 6px; font: 400 13px/1.3 var(--type); color: var(--pencil); }
+.font-group:not(:first-of-type) { margin-top: 16px; }
 .font-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; max-width: 720px; }
 .font-opt {
   border: 1px solid rgba(44,43,39,.22); background: rgba(247,245,239,.35); border-radius: 2px;
   padding: 10px 12px 8px; text-align: left; line-height: 1.2;
 }
 .font-opt[aria-pressed="true"] { background: var(--paper); border-color: var(--ink); box-shadow: 0 1px 2px rgba(40,40,34,.2); }
-.font-opt .sample { display: block; font-size: 24px; color: var(--ink); }
+.font-opt .sample { display: block; font-size: 21px; color: var(--ink); }
 .font-opt .name { display: block; margin-top: 4px; font: 400 12px/1.3 var(--type); color: var(--pencil); }
 
 /* ---------- viewer ---------- */
@@ -199,7 +210,7 @@ header.top { display: flex; align-items: baseline; justify-content: space-betwee
 .viewer .photo { position: relative; display: inline-block; line-height: 0; max-width: 100%; }
 .viewer .photo img { max-width: 100%; max-height: calc(100vh - 190px); width: auto; height: auto; }
 .viewer .stamp { height: clamp(14px, 3vw, 22px); }
-.viewer .vcap { margin: 12px auto 0; padding: 0 20px; max-width: 640px; text-align: center; font: 400 calc(26px * var(--hs)) / 1.25 var(--hand); color: #ECEAE2; white-space: pre-wrap; }
+.viewer .vcap { margin: 12px auto 0; padding: 0 20px; max-width: 640px; text-align: center; font: 400 22px/1.3 var(--hand); color: #ECEAE2; white-space: pre-wrap; }
 .viewer .pager { display: flex; justify-content: center; gap: 28px; align-items: center; padding: 12px 18px 18px; color: #C9CBC2; font-size: 14px; }
 .viewer .pager button {
   width: 44px; height: 44px; border-radius: 2px; border: 1px solid rgba(247,245,239,.3);

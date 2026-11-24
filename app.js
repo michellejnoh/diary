@@ -148,22 +148,30 @@ const LAST_BACKUP = "diary.lastBackup", LAST_CHANGE = "diary.lastChange";
 const photoFile = p => `${p.date}_${p.id}.jpg`;
 const canFolder = "showDirectoryPicker" in window;
 
-// ---------- handwriting fonts ----------
-const FONTS = [
-  { key: "nanumpenscript", family: "Nanum Pen Script", name: "나눔손글씨 펜", scale: 1 },
-  { key: "gaegu", family: "Gaegu", name: "개구", scale: .86 },
-  { key: "gamjaflower", family: "Gamja Flower", name: "감자꽃", scale: .9 },
-  { key: "himelody", family: "Hi Melody", name: "하이멜로디", scale: .9 },
-  { key: "poorstory", family: "Poor Story", name: "푸어스토리", scale: .8 },
-  { key: "yeonsung", family: "Yeon Sung", name: "연성", scale: .84 },
-  { key: "gowunbatang", family: "Gowun Batang", name: "고운바탕", scale: .66 },
+// ---------- handwriting fonts (Korean + English picked separately) ----------
+const KO_FONTS = [
+  { key: "nanumpenscript", family: "Nanum Pen Script", name: "나눔손글씨 펜" },
+  { key: "gaegu", family: "Gaegu", name: "개구" },
+  { key: "poorstory", family: "Poor Story", name: "푸어스토리" },
+  { key: "gowunbatang", family: "Gowun Batang", name: "고운바탕" },
 ];
-const HAND = "diary.hand";
-const handKey = () => { try { return localStorage.getItem(HAND) || FONTS[0].key; } catch { return FONTS[0].key; } };
-function applyHand(key) {
-  const f = FONTS.find(x => x.key === key) || FONTS[0];
-  document.documentElement.dataset.hand = f.key;
-  document.fonts?.load(`20px "${f.family}"`, "가"); // fetch the whole font now, not mid-typing
+const EN_FONTS = [
+  { key: "caveat", family: "Caveat", name: "Caveat" },
+  { key: "patrickhand", family: "Patrick Hand", name: "Patrick Hand" },
+  { key: "indieflower", family: "Indie Flower", name: "Indie Flower" },
+  { key: "ebgaramond", family: "EB Garamond", name: "EB Garamond" },
+];
+const pickFont = (list, key) => list.find(f => f.key === key) || list[0];
+const getPref = (k, d) => { try { return localStorage.getItem(k) || d; } catch { return d; } };
+const fontsNow = () => ({
+  ko: pickFont(KO_FONTS, getPref("diary.hand.ko", getPref("diary.hand", ""))),
+  en: pickFont(EN_FONTS, getPref("diary.hand.en", "")),
+});
+function applyHand() {
+  const { ko, en } = fontsNow();
+  document.documentElement.style.setProperty("--hand", `"${en.family}", "${ko.family}", "Apple SD Gothic Neo", sans-serif`);
+  document.fonts?.load(`20px "${ko.family}"`, "가"); // fetch the whole Korean font now, not mid-typing
+  document.fonts?.load(`20px "${en.family}"`, "a");
 }
 function setBarColor(color) { // Safari top and bottom bars
   let m = document.querySelector('meta[name="theme-color"]');
@@ -179,7 +187,7 @@ export async function mount(root, state) {
   const ctl = new AbortController();
   const on = (el, ev, fn, opts = {}) => el.addEventListener(ev, fn, { ...opts, signal: ctl.signal });
 
-  applyHand(handKey());
+  applyHand();
   setBarColor(CARD);
   if (navigator.storage?.persist) navigator.storage.persisted().then(p => p || navigator.storage.persist());
 
@@ -331,10 +339,10 @@ export async function mount(root, state) {
     root.innerHTML = `
       <div class="wrap">
         <header class="top">
-          <a class="wordmark" href="#/">diary</a>
+          <a class="wordmark press" href="#/">diary</a>
           <a class="link" href="#/archive">${isToday ? "Archive" : "Back to archive"}</a>
         </header>
-        <h1 class="page-title">${title}</h1>
+        <h1 class="page-title press">${title}</h1>
         <div class="roll">${prints}${add}</div>
         <div class="slip">
           <span class="tape" aria-hidden="true"></span>
@@ -373,7 +381,7 @@ export async function mount(root, state) {
       }
       months += `
         <section class="month">
-          <h2>${MONTHS[m]} ${y}${n ? `<span class="count">${n} of ${daysIn} days</span>` : ""}</h2>
+          <h2 class="press">${MONTHS[m]} ${y}${n ? `<span class="count">${n} of ${daysIn} days</span>` : ""}</h2>
           <div class="weekdays" aria-hidden="true"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>
           <div class="grid">${cells}</div>
         </section>`;
@@ -399,18 +407,23 @@ export async function mount(root, state) {
     root.innerHTML = `
       <div class="wrap">
         <header class="top">
-          <a class="wordmark" href="#/">diary</a>
+          <a class="wordmark press" href="#/">diary</a>
           <a class="link" href="#/">Today</a>
         </header>
-        <h1 class="page-title">Archive</h1>
+        <h1 class="page-title press">Archive</h1>
         <p class="summary">${photoTotal ? `${photoTotal} photo${photoTotal > 1 ? "s" : ""} over ${dates.length} day${dates.length > 1 ? "s" : ""}` : "Nothing here yet."}</p>
         <div class="months">${months}</div>
         <details class="fonts" ${state.fontsOpen ? "open" : ""}>
-          <summary>Handwriting: <span id="handName">${(FONTS.find(f => f.key === handKey()) || FONTS[0]).name}</span></summary>
-          <div class="font-list">${FONTS.map(f => `
-            <button class="font-opt" data-font="${f.key}" aria-pressed="${f.key === handKey()}">
-              <span class="sample" style="font-family:'${f.family}';font-size:${Math.round(26 * f.scale)}px">오늘의 기록</span>
-              <span class="name">${f.name}</span>
+          <summary>Handwriting: <span id="handName">${fontsNow().ko.name} + ${fontsNow().en.name}</span></summary>
+          <p class="font-group">한글</p>
+          <div class="font-list">${KO_FONTS.map(f => `
+            <button class="font-opt" data-font="${f.key}" data-lang="ko" aria-pressed="${f.key === fontsNow().ko.key}">
+              <span class="sample" style="font-family:'${f.family}'">오늘의 기록</span><span class="name">${f.name}</span>
+            </button>`).join("")}</div>
+          <p class="font-group">English</p>
+          <div class="font-list">${EN_FONTS.map(f => `
+            <button class="font-opt" data-font="${f.key}" data-lang="en" aria-pressed="${f.key === fontsNow().en.key}">
+              <span class="sample" style="font-family:'${f.family}'">Today’s page</span><span class="name">${f.name}</span>
             </button>`).join("")}</div>
         </details>
         <div class="keep">
@@ -560,10 +573,11 @@ export async function mount(root, state) {
     else if (has("data-export")) exportBackup();
     else if (has("data-import")) { importInput.value = ""; importInput.click(); }
     else if (t.dataset.font) {
-      try { localStorage.setItem(HAND, t.dataset.font); } catch {}
-      applyHand(t.dataset.font);
-      root.querySelectorAll(".font-opt").forEach(b => b.setAttribute("aria-pressed", String(b === t)));
-      const hn = root.querySelector("#handName"); if (hn) hn.textContent = FONTS.find(f => f.key === t.dataset.font).name;
+      const lang = t.dataset.lang;
+      try { localStorage.setItem(`diary.hand.${lang}`, t.dataset.font); } catch {}
+      applyHand();
+      root.querySelectorAll(`.font-opt[data-lang="${lang}"]`).forEach(b => b.setAttribute("aria-pressed", String(b === t)));
+      const hn = root.querySelector("#handName"); if (hn) hn.textContent = `${fontsNow().ko.name} + ${fontsNow().en.name}`;
     }
     else if (has("data-folder")) chooseFolder();
     else if (has("data-resume")) resumeFolder();
