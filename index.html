@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>diary</title>
+<meta name="theme-color" content="#D7DAD4">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="diary">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon.png">
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Spectral:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --card: #D7DAD4;      /* grey album card */
+    --card-deep: #C6CAC2; /* empty frames */
+    --paper: #F8F8F5;     /* print border */
+    --ink: #2A2B28;       /* pen */
+    --pencil: #6B6F68;    /* secondary text */
+    --stamp: #FF7B22;     /* film date imprint */
+    --serif: "Spectral", Georgia, serif;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    background: var(--card);
+    color: var(--ink);
+    font: 400 17px/1.55 var(--serif);
+    min-height: 100vh;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+  }
+  button, textarea { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  :focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+
+  .wrap { max-width: 1160px; margin: 0 auto; padding: 20px 20px 48px; }
+
+  header.top {
+    display: flex; align-items: baseline; justify-content: space-between;
+    padding: 4px 0 22px;
+  }
+  .wordmark { font-size: 22px; font-weight: 500; letter-spacing: .01em; margin: 0; }
+  .today-link {
+    background: none; border: 0; padding: 6px 0; color: var(--pencil);
+    text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px;
+  }
+  .today-link[hidden] { display: none; }
+
+  main { display: grid; gap: 40px; }
+  @media (min-width: 900px) {
+    main { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 64px; align-items: start; }
+    .day { position: sticky; top: 24px; }
+  }
+
+  /* ---------- the print ---------- */
+  .day-title { margin: 0 0 14px; font-size: 19px; font-weight: 400; }
+  .day-title .weekday { color: var(--pencil); }
+
+  .print {
+    background: var(--paper);
+    padding: 12px;
+    box-shadow: 0 1px 1px rgba(40,42,38,.18), 0 10px 24px -12px rgba(40,42,38,.45);
+    transform: rotate(-0.5deg);
+    max-width: 640px;
+  }
+  .photo { position: relative; line-height: 0; background: #1d1e1c; }
+  .photo img { display: block; width: 100%; height: auto; max-height: 72vh; object-fit: contain; background: #1d1e1c; }
+  .stamp {
+    position: absolute; right: 4.5%; bottom: 4%;
+    height: clamp(14px, 3.4vw, 22px);
+    filter: drop-shadow(0 0 1.5px rgba(255,123,34,.9)) drop-shadow(0 0 5px rgba(255,90,20,.45));
+    opacity: .93; pointer-events: none;
+  }
+  .stamp svg { height: 100%; width: auto; display: block; }
+
+  .empty-print {
+    aspect-ratio: 4 / 3; background: var(--card-deep);
+    display: grid; place-items: center; text-align: center; padding: 24px;
+    line-height: 1.5;
+  }
+  .empty-print p { margin: 0 0 14px; color: var(--pencil); }
+
+  .btn {
+    background: var(--ink); color: var(--paper); border: 0;
+    padding: 11px 20px; border-radius: 2px; font-size: 16px;
+  }
+  .btn-quiet {
+    background: none; border: 0; padding: 6px 0; color: var(--pencil);
+    text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px;
+    font-size: 15px;
+  }
+  .btn-quiet.danger-armed { color: #A3341B; }
+
+  .note {
+    display: block; width: 100%; max-width: 640px;
+    margin: 22px 0 0; padding: 0; border: 0; background: transparent;
+    font-style: italic; font-size: 19px; line-height: 1.65; resize: none;
+    min-height: 3.3em; overflow: hidden;
+    background-image: linear-gradient(to bottom, transparent calc(1.65em - 1px), rgba(42,43,40,.16) calc(1.65em - 1px));
+    background-size: 100% 1.65em;
+  }
+  .note::placeholder { color: var(--pencil); opacity: .8; }
+  .note:focus-visible { outline: none; }
+  .note:focus { background-image: linear-gradient(to bottom, transparent calc(1.65em - 1px), rgba(42,43,40,.35) calc(1.65em - 1px)); }
+
+  .print-actions { display: flex; gap: 22px; align-items: baseline; margin-top: 12px; max-width: 640px; }
+  .saved { margin-left: auto; color: var(--pencil); font-size: 15px; opacity: 0; transition: opacity .3s; }
+  .saved.show { opacity: 1; }
+
+  /* ---------- contact sheet ---------- */
+  .sheet-head { display: flex; align-items: baseline; gap: 12px; margin-bottom: 14px; }
+  .sheet-head h2 { margin: 0; font-size: 19px; font-weight: 400; }
+  .sheet-head .count { color: var(--pencil); font-size: 15px; }
+  .nav { margin-left: auto; display: flex; gap: 4px; }
+  .nav button {
+    width: 36px; height: 36px; border: 1px solid rgba(42,43,40,.25); background: transparent;
+    border-radius: 2px; font-size: 18px; line-height: 1;
+  }
+  .nav button:disabled { opacity: .3; cursor: default; }
+
+  .weekdays, .grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 5px; }
+  .weekdays { margin-bottom: 6px; color: var(--pencil); font-size: 13px; text-align: center; }
+  .cell {
+    position: relative; aspect-ratio: 1; border: 0; padding: 0; overflow: hidden;
+    background: var(--card-deep); border-radius: 1px;
+  }
+  .cell img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .cell .n {
+    position: absolute; left: 5px; top: 3px; font-size: 13px; line-height: 1.2; color: var(--pencil);
+  }
+  .cell.has .n {
+    color: var(--paper); text-shadow: 0 0 3px rgba(0,0,0,.55);
+  }
+  .cell.blank { background: transparent; pointer-events: none; }
+  .cell.future { opacity: .4; cursor: default; }
+  .cell.today::after {
+    content: ""; position: absolute; inset: 0; box-shadow: inset 0 0 0 2px var(--ink);
+  }
+  .cell.selected { outline: 2px solid var(--stamp); outline-offset: 2px; }
+
+  .keep { margin-top: 36px; font-size: 15px; color: var(--pencil); line-height: 1.6; max-width: 46ch; }
+  .keep p { margin: 0 0 8px; }
+  .keep .row { display: flex; gap: 22px; }
+
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+  /* one moment of motion: a new print develops */
+  @keyframes develop { from { filter: brightness(1.9) saturate(.2) sepia(.3); } to { filter: none; } }
+  .photo img.developing { animation: develop 1.6s ease-out; }
+  @media (prefers-reduced-motion: reduce) {
+    .photo img.developing { animation: none; }
+    .saved { transition: none; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <h1 class="wordmark">diary</h1>
+    <button class="today-link" id="goToday" hidden>Back to today</button>
+  </header>
+
+  <main>
+    <section class="day" aria-labelledby="dayTitle">
+      <h2 class="day-title" id="dayTitle"></h2>
+      <div id="printArea"></div>
+    </section>
+
+    <section aria-labelledby="monthTitle">
+      <div class="sheet-head">
+        <h2 id="monthTitle"></h2>
+        <span class="count" id="monthCount"></span>
+        <div class="nav">
+          <button id="prevMonth" aria-label="Previous month">‹</button>
+          <button id="nextMonth" aria-label="Next month">›</button>
+        </div>
+      </div>
+      <div class="weekdays" aria-hidden="true">
+        <span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span>
+      </div>
+      <div class="grid" id="grid" role="grid"></div>
+
+      <div class="keep">
+        <p>Photos are kept on this device only. Save a backup now and then, or to move your diary to another device.</p>
+        <div class="row">
+          <button class="btn-quiet" id="exportBtn">Save backup</button>
+          <button class="btn-quiet" id="importBtn">Restore from backup</button>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<input type="file" id="fileInput" accept="image/*" class="sr" tabindex="-1" aria-hidden="true">
+<input type="file" id="importInput" accept="application/json,.json" class="sr" tabindex="-1" aria-hidden="true">
+
+<script>
+(() => {
+  // ---------- dates ----------
+  const pad = n => String(n).padStart(2, "0");
+  const keyOf = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+  const fromKey = k => { const [y, m, d] = k.split("-").map(Number); return new Date(y, m - 1, d); };
+  const todayKey = () => keyOf(new Date());
+  const WEEKDAYS = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+
+  // ---------- storage (IndexedDB) ----------
+  let dbp;
+  const db = () => dbp || (dbp = new Promise((res, rej) => {
+    const r = indexedDB.open("diary", 1);
+    r.onupgradeneeded = () => r.result.createObjectStore("days", { keyPath: "date" });
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => rej(r.error);
+  }));
+  const tx = async (mode, fn) => {
+    const d = await db();
+    return new Promise((res, rej) => {
+      const t = d.transaction("days", mode);
+      const s = t.objectStore("days");
+      let out;
+      const r = fn(s);
+      if (r) r.onsuccess = () => { out = r.result; };
+      t.oncomplete = () => res(out);
+      t.onerror = () => rej(t.error);
+    });
+  };
+  const getDay = k => tx("readonly", s => s.get(k));
+  const putDay = v => tx("readwrite", s => s.put(v));
+  const delDay = k => tx("readwrite", s => s.delete(k));
+  const allDays = () => tx("readonly", s => s.getAll());
+  const monthDays = (y, m) => {
+    const lo = `${y}-${pad(m + 1)}-01`, hi = `${y}-${pad(m + 1)}-31`;
+    return tx("readonly", s => s.getAll(IDBKeyRange.bound(lo, hi)));
+  };
+
+  // ---------- images ----------
+  const loadImage = src => new Promise((res, rej) => {
+    const img = new Image();
+    img.onload = () => res(img);
+    img.onerror = () => rej(new Error("This file couldn't be read as a photo."));
+    img.src = src;
+  });
+  const resize = (img, max, quality) => {
+    const s = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement("canvas");
+    c.width = Math.round(img.naturalWidth * s);
+    c.height = Math.round(img.naturalHeight * s);
+    c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+    return new Promise(r => c.toBlob(r, "image/jpeg", quality));
+  };
+  const squareThumb = (img, size) => {
+    const c = document.createElement("canvas");
+    c.width = c.height = size;
+    const w = img.naturalWidth, h = img.naturalHeight, m = Math.min(w, h);
+    c.getContext("2d").drawImage(img, (w - m) / 2, (h - m) / 2, m, m, 0, 0, size, size);
+    return new Promise(r => c.toBlob(r, "image/jpeg", 0.8));
+  };
+
+  // object URLs, revoked on each render
+  let urls = [];
+  const url = blob => { const u = URL.createObjectURL(blob); urls.push(u); return u; };
+  const revokeAll = () => { urls.forEach(URL.revokeObjectURL); urls = []; };
+
+  // ---------- 7-segment date stamp ----------
+  const SEG = { // segments: a b c d e f g
+    0: "abcdef", 1: "bc", 2: "abged", 3: "abgcd", 4: "fgbc",
+    5: "afgcd", 6: "afgedc", 7: "abc", 8: "abcdefg", 9: "abcdfg"
+  };
+  const segShapes = (x) => {
+    const W = 10, H = 18, t = 2, g = .5; // digit width/height, thickness, gap
+    const r = (sx, sy, w, h) => `<rect x="${x + sx}" y="${sy}" width="${w}" height="${h}" rx="1"/>`;
+    return {
+      a: r(t / 2 + g, 0, W - t - 2 * g, t),
+      g: r(t / 2 + g, H / 2 - t / 2, W - t - 2 * g, t),
+      d: r(t / 2 + g, H - t, W - t - 2 * g, t),
+      f: r(0, t / 2 + g, t, H / 2 - t - g),
+      b: r(W - t, t / 2 + g, t, H / 2 - t - g),
+      e: r(0, H / 2 + g, t, H / 2 - t - g),
+      c: r(W - t, H / 2 + g, t, H / 2 - t - g),
+    };
+  };
+  const stampSVG = (k) => {
+    const [y, m, d] = k.split("-");
+    const groups = [y.slice(2), m, d];
+    let x = 5, parts = [`<rect x="0" y="0" width="2" height="5" rx="1" transform="skewX(-8)"/>`]; // the apostrophe
+    groups.forEach((grp, gi) => {
+      for (const ch of grp) {
+        const shapes = segShapes(x);
+        parts.push(SEG[ch].split("").map(s => shapes[s]).join(""));
+        x += 13;
+      }
+      if (gi < 2) x += 7;
+    });
+    return `<svg viewBox="-1 -1 ${x - 1} 20" fill="#FF7B22" aria-hidden="true"><g transform="skewX(-6) translate(1 0)">${parts.join("")}</g></svg>`;
+  };
+
+  // ---------- state ----------
+  const now = new Date();
+  let selected = todayKey();
+  let viewY = now.getFullYear(), viewM = now.getMonth();
+  let current = null;           // record for selected day
+  let justDeveloped = false;
+
+  const $ = id => document.getElementById(id);
+  const printArea = $("printArea");
+
+  // ---------- render: selected day ----------
+  async function renderDay() {
+    const d = fromKey(selected);
+    const isToday = selected === todayKey();
+    $("dayTitle").innerHTML =
+      `<span class="weekday">${isToday ? "Today" : WEEKDAYS[d.getDay()]},</span> ${d.getDate()} ${MONTHS[d.getMonth()]}${d.getFullYear() !== now.getFullYear() ? " " + d.getFullYear() : ""}`;
+    $("goToday").hidden = isToday;
+
+    current = await getDay(selected);
+
+    if (!current || !current.photo) {
+      printArea.innerHTML = `
+        <div class="print"><div class="empty-print"><div>
+          <p>${isToday ? "No photo for today yet." : "Nothing on this day."}</p>
+          <button class="btn" id="addBtn">${isToday ? "Add today’s photo" : "Add a photo"}</button>
+        </div></div></div>
+        ${noteHTML(current?.note || "")}`;
+      $("addBtn").onclick = pickPhoto;
+    } else {
+      printArea.innerHTML = `
+        <div class="print"><div class="photo">
+          <img src="${url(current.photo)}" alt="Photo for ${d.getDate()} ${MONTHS[d.getMonth()]}" class="${justDeveloped ? "developing" : ""}">
+          <div class="stamp">${stampSVG(selected)}</div>
+        </div></div>
+        ${noteHTML(current.note || "")}
+        <div class="print-actions">
+          <button class="btn-quiet" id="replaceBtn">Replace photo</button>
+          <button class="btn-quiet" id="deleteBtn">Delete</button>
+          <span class="saved" id="saved" aria-live="polite">Saved</span>
+        </div>`;
+      $("replaceBtn").onclick = pickPhoto;
+      armDelete($("deleteBtn"));
+    }
+    justDeveloped = false;
+    wireNote();
+  }
+
+  const noteHTML = (text) =>
+    `<label class="sr" for="note">Note for this day</label>
+     <textarea class="note" id="note" rows="2" placeholder="Write a line about this day…">${escapeHTML(text)}</textarea>`;
+  const escapeHTML = s => s.replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+
+  function wireNote() {
+    const ta = $("note");
+    const grow = () => { ta.style.height = "auto"; ta.style.height = ta.scrollHeight + "px"; };
+    grow();
+    let timer;
+    ta.addEventListener("input", () => {
+      grow();
+      clearTimeout(timer);
+      timer = setTimeout(async () => {
+        const rec = (await getDay(selected)) || { date: selected };
+        rec.note = ta.value;
+        rec.updated = Date.now();
+        if (!rec.photo && !rec.note) await delDay(selected); else await putDay(rec);
+        const s = $("saved");
+        if (s) { s.classList.add("show"); setTimeout(() => s.classList.remove("show"), 1200); }
+      }, 500);
+    });
+  }
+
+  function armDelete(btn) {
+    let armed = false, t;
+    btn.onclick = async () => {
+      if (!armed) {
+        armed = true;
+        btn.textContent = "Tap again to delete";
+        btn.classList.add("danger-armed");
+        t = setTimeout(() => { armed = false; btn.textContent = "Delete"; btn.classList.remove("danger-armed"); }, 3000);
+        return;
+      }
+      clearTimeout(t);
+      await delDay(selected);
+      render();
+    };
+  }
+
+  // ---------- render: contact sheet ----------
+  async function renderMonth() {
+    $("monthTitle").textContent = `${MONTHS[viewM]} ${viewY}`;
+    const recs = await monthDays(viewY, viewM);
+    const byDate = Object.fromEntries(recs.map(r => [r.date, r]));
+    const daysIn = new Date(viewY, viewM + 1, 0).getDate();
+    const lead = (new Date(viewY, viewM, 1).getDay() + 6) % 7; // Monday first
+    const tKey = todayKey();
+    const withPhoto = recs.filter(r => r.photo).length;
+    $("monthCount").textContent = withPhoto ? `${withPhoto} of ${daysIn} days` : "";
+
+    let html = "";
+    for (let i = 0; i < lead; i++) html += `<div class="cell blank"></div>`;
+    for (let day = 1; day <= daysIn; day++) {
+      const k = `${viewY}-${pad(viewM + 1)}-${pad(day)}`;
+      const r = byDate[k];
+      const future = k > tKey;
+      const cls = ["cell", r?.photo ? "has" : "", future ? "future" : "", k === tKey ? "today" : "", k === selected ? "selected" : ""].join(" ");
+      html += `<button class="${cls}" data-k="${k}" ${future ? "disabled" : ""} aria-label="${day} ${MONTHS[viewM]}${r?.photo ? ", has photo" : ""}">
+        ${r?.thumb ? `<img src="${url(r.thumb)}" alt="">` : ""}<span class="n">${day}</span></button>`;
+    }
+    $("grid").innerHTML = html;
+
+    const isCurrentMonth = viewY === now.getFullYear() && viewM === now.getMonth();
+    $("nextMonth").disabled = isCurrentMonth || new Date(viewY, viewM + 1, 1) > new Date();
+  }
+
+  async function render() { revokeAll(); await Promise.all([renderDay(), renderMonth()]); }
+
+  // ---------- interactions ----------
+  $("grid").addEventListener("click", e => {
+    const b = e.target.closest(".cell[data-k]");
+    if (!b || b.disabled) return;
+    selected = b.dataset.k;
+    render().then(() => {
+      if (window.matchMedia("(max-width: 899px)").matches) window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  });
+  $("prevMonth").onclick = () => { if (--viewM < 0) { viewM = 11; viewY--; } renderMonth(); };
+  $("nextMonth").onclick = () => { if (++viewM > 11) { viewM = 0; viewY++; } renderMonth(); };
+  $("goToday").onclick = () => {
+    selected = todayKey();
+    viewY = new Date().getFullYear(); viewM = new Date().getMonth();
+    render();
+  };
+
+  function pickPhoto() { $("fileInput").value = ""; $("fileInput").click(); }
+  $("fileInput").addEventListener("change", async e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const src = URL.createObjectURL(file);
+    try {
+      const img = await loadImage(src);
+      const [photo, thumb] = await Promise.all([resize(img, 1800, 0.86), squareThumb(img, 240)]);
+      const rec = (await getDay(selected)) || { date: selected, note: "" };
+      Object.assign(rec, { photo, thumb, updated: Date.now() });
+      await putDay(rec);
+      if (navigator.storage?.persist) navigator.storage.persist();
+      justDeveloped = true;
+      render();
+    } catch (err) {
+      alert(err.message + " Try a JPEG, PNG or HEIC photo.");
+    } finally {
+      URL.revokeObjectURL(src);
+    }
+  });
+
+  // ---------- backup ----------
+  const blobToData = b => new Promise(r => { const f = new FileReader(); f.onload = () => r(f.result); f.readAsDataURL(b); });
+  const dataToBlob = async d => (await fetch(d)).blob();
+
+  $("exportBtn").onclick = async () => {
+    const days = await allDays();
+    const out = [];
+    for (const r of days) {
+      out.push({
+        date: r.date, note: r.note || "", updated: r.updated || 0,
+        photo: r.photo ? await blobToData(r.photo) : null,
+        thumb: r.thumb ? await blobToData(r.thumb) : null
+      });
+    }
+    const blob = new Blob([JSON.stringify({ app: "diary", version: 1, days: out })], { type: "application/json" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `diary-backup-${todayKey()}.json`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  };
+
+  $("importBtn").onclick = () => { $("importInput").value = ""; $("importInput").click(); };
+  $("importInput").addEventListener("change", async e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      const data = JSON.parse(await file.text());
+      if (data.app !== "diary" || !Array.isArray(data.days)) throw new Error();
+      let n = 0;
+      for (const r of data.days) {
+        const existing = await getDay(r.date);
+        if (existing && (existing.updated || 0) > (r.updated || 0)) continue; // keep the newer one
+        await putDay({
+          date: r.date, note: r.note || "", updated: r.updated || Date.now(),
+          photo: r.photo ? await dataToBlob(r.photo) : null,
+          thumb: r.thumb ? await dataToBlob(r.thumb) : null
+        });
+        n++;
+      }
+      alert(`Restored ${n} day${n === 1 ? "" : "s"}.`);
+      render();
+    } catch {
+      alert("This file isn’t a diary backup. Choose a file named diary-backup-….json.");
+    }
+  });
+
+  // re-render when the date rolls over while the page is open
+  let lastToday = todayKey();
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState !== "visible" || todayKey() === lastToday) return;
+    if (selected === lastToday) { selected = todayKey(); viewY = new Date().getFullYear(); viewM = new Date().getMonth(); }
+    lastToday = todayKey();
+    render();
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
