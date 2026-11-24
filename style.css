@@ -637,3 +637,5 @@ header.top { padding-bottom: 12px; }
 .board.editing .h-rot, .board.editing .h-del { touch-action: none; }
 /* a picked piece belongs to your finger: no scrolling, it drags at once */
 .board.editing .ci.sel { touch-action: none; }
+/* text being written must be selectable, or iPhone Safari won't type into it */
+.board.editing .ci .ctext[contenteditable="true"], .board.editing .ci .sctext[contenteditable="true"] { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }

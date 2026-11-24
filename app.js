@@ -1,4 +1,4 @@
-export const VERSION = "53"; // bump on every change; shown at the bottom of Archive
+export const VERSION = "54"; // bump on every change; shown at the bottom of Archive
 // diary — app code. Loaded (and hot-swapped) by index.html.
 // mount(root, state) draws the app and returns an unmount function.
 
@@ -746,6 +746,7 @@ export async function mount(root, state) {
     col.items.push(it);
     boardEl.insertAdjacentHTML("beforeend", itemHTML(it));
     select(it.id); fitBoard(); saveCollage();
+    if (type !== "clip") startTextEdit(itemEl(it.id), it);
   }
   function addItem(kind) {
     checkpoint();
@@ -880,12 +881,13 @@ export async function mount(root, state) {
 
   // ---------- decorate toolbar ----------
   let decoTab = null, decoKind = null;
+  const tabMemory = {}; // the tab you last opened, per kind of piece
   function renderDecoBar() {
     const bar = root.querySelector(".decobar"); if (!bar) return;
     const it = col?.items.find(i => i.id === selectedId);
     const kind = it?.kind || "none";
     const tabsFor = { none: [["add", "Add"], ["scraps", "Scraps"], ["page", "Page"]], text: [["style", "Style"], ["color", "Color"], ["marker", "Marker"]], photo: [["frame", "Frame"], ["look", "Look"]], image: [], tape: [], scrap: [] }[kind];
-    if (kind !== decoKind) { decoKind = kind; decoTab = tabsFor[0]?.[0] || null; }
+    if (kind !== decoKind) { decoKind = kind; decoTab = kind in tabMemory ? tabMemory[kind] : (tabsFor[0]?.[0] || null); }
     const b = (attrs, label, pressed) => `<button ${attrs}${pressed != null ? ` aria-pressed="${!!pressed}"` : ""}>${label}</button>`;
     const opt = {
       scraps: () => SCRAPS.map(([k, n]) => b(`data-scrap="${k}"`, n)).join(""),
@@ -1329,7 +1331,7 @@ export async function mount(root, state) {
     else if (has("data-signout")) { await cloud?.signOut(); }
     else if (has("data-syncnow")) cloud?.sync();
     else if (has("data-saveimg")) saveImage(t);
-    else if (t.dataset.dtab) { decoTab = decoTab === t.dataset.dtab ? null : t.dataset.dtab; renderDecoBar(); }
+    else if (t.dataset.dtab) { decoTab = decoTab === t.dataset.dtab ? null : t.dataset.dtab; tabMemory[decoKind] = decoTab; renderDecoBar(); }
     else if (t.dataset.paper) setPaper(t.dataset.paper);
     else if (t.dataset.look) {
       try { localStorage.setItem(LOOK, t.dataset.look); } catch {}
