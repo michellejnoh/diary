@@ -1,6 +1,6 @@
 {
-  "name": "diary",
-  "short_name": "diary",
+  "name": "Diary",
+  "short_name": "Diary",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#D5D7CE",

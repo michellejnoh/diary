@@ -1,4 +1,4 @@
-export const VERSION = "10"; // bump on every change; shown at the bottom of Archive
+export const VERSION = "11"; // bump on every change; shown at the bottom of Archive
 // diary — app code. Loaded (and hot-swapped) by index.html.
 // mount(root, state) draws the app and returns an unmount function.
 
@@ -360,7 +360,7 @@ export async function mount(root, state) {
     root.innerHTML = `
       <div class="wrap${editing ? " decorating" : ""}">
         <header class="top">
-          <a class="wordmark press" href="#/">diary</a>
+          <a class="wordmark press" href="#/">Diary</a>
           <a class="link" href="#/archive">${isToday ? "Archive" : "Back to archive"}</a>
         </header>
         <div class="dayhead">
@@ -424,7 +424,7 @@ export async function mount(root, state) {
     if (i.kind === "photo") {
       const p = photoMap()[i.ref]; if (!p) return "";
       const time = keyOf(new Date(p.added)) === p.date ? `<span class="time">${timeOf(p.added)}</span>` : "";
-      const img = `<span class="photo"><img src="${url(p.blob)}" alt="" draggable="false" class="${developIds.has(p.id) ? "developing" : ""}"><span class="stamp">${stampSVG(p.date)}</span></span>`;
+      const img = `<span class="photo"><img src="${url(p.blob)}" alt="" draggable="false" class="${developIds.has(p.id) ? "developing" : ""}"></span>`;
       inner = `<span class="tape" aria-hidden="true"></span>` + (editing
         ? `<div class="frame">${img}</div>${p.caption ? `<p class="ccap">${esc(p.caption)}</p>` : ""}`
         : `<button class="frame" data-open="${p.id}" aria-label="Open photo">${img}</button>
@@ -785,7 +785,7 @@ export async function mount(root, state) {
     root.innerHTML = `
       <div class="wrap">
         <header class="top">
-          <a class="wordmark press" href="#/">diary</a>
+          <a class="wordmark press" href="#/">Diary</a>
           <a class="link" href="#/">Today</a>
         </header>
         <h1 class="page-title day-title">Archive</h1>
@@ -835,7 +835,7 @@ export async function mount(root, state) {
         <button class="link" data-close>Close</button>
         <button class="link" data-delete="${p.id}">Delete photo</button>
       </div>
-      <div class="stage"><span class="photo"><img src="${url(p.blob)}" alt="Photo ${i + 1} of ${dayPhotos.length}"><span class="stamp">${stampSVG(p.date)}</span></span></div>
+      <div class="stage"><span class="photo"><img src="${url(p.blob)}" alt="Photo ${i + 1} of ${dayPhotos.length}"></span></div>
       ${p.caption ? `<p class="vcap">${esc(p.caption)}</p>` : ""}
       <div class="pager">
         <button data-step="-1" aria-label="Previous photo" ${i === 0 ? "disabled" : ""}>‹</button>
