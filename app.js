@@ -1,4 +1,4 @@
-export const VERSION = "27"; // bump on every change; shown at the bottom of Archive
+export const VERSION = "28"; // bump on every change; shown at the bottom of Archive
 // diary — app code. Loaded (and hot-swapped) by index.html.
 // mount(root, state) draws the app and returns an unmount function.
 
@@ -167,6 +167,8 @@ const LAYER_ICONS = (() => {
     back: svg(`${sq(4, false)}${sq(9, false)}${sq(14, true)}`),
   };
 })();
+const UNDO_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 7L4.5 11.5 9 16"/><path d="M5 11.5h9a5 5 0 0 1 0 10h-3"/></svg>`;
+const REDO_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 7l4.5 4.5L15 16"/><path d="M19 11.5h-9a5 5 0 0 0 0 10h3"/></svg>`;
 const ROTATE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18.5 9.5a7 7 0 1 0 .8 5.6"/><path d="M19 4.5v5h-5"/></svg>`;
 
 // ---------- backup bookkeeping ----------
@@ -643,7 +645,12 @@ export async function mount(root, state) {
     boardEl.querySelectorAll(".ci").forEach(el => { max = Math.max(max, el.offsetTop + el.offsetHeight); });
     boardEl.style.height = Math.max(max + 36, state.decorating ? boardEl.clientWidth * .9 : 120) + "px";
   }
+  function refreshUndo() {
+    const u = root.querySelector('[data-deco="undo"]'), r = root.querySelector('[data-deco="redo"]');
+    if (u) u.disabled = !undoStack.length; if (r) r.disabled = !redoStack.length;
+  }
   function saveCollage(now = false) {
+    refreshUndo();
     clearTimeout(colTimer);
     const k = colKey, items = structuredClone(col.items);
     const go = async () => { await store.patchDay(k, { collage: { items } }); changed(); };
@@ -665,11 +672,35 @@ export async function mount(root, state) {
     boardEl?.querySelectorAll(".ci").forEach(el => el.classList.toggle("sel", el.dataset.id === id));
     renderDecoBar();
   }
+  // ---------- undo / redo / cancel ----------
+  // each change in Decorate first saves a copy of the page, so it can be stepped back
+  let undoStack = [], redoStack = [];
+  const snapNow = () => ({ items: structuredClone(col.items), paper: paperNow });
+  function checkpoint() {
+    if (!col) return;
+    undoStack.push(snapNow()); if (undoStack.length > 60) undoStack.shift();
+    redoStack = [];
+  }
+  async function restoreSnap(sn) {
+    col.items = structuredClone(sn.items);
+    if (sn.paper !== paperNow) await setPaper(sn.paper, false);
+    selectedId = null; drawBoard(); renderDecoBar(); saveCollage();
+  }
+  function undo() { if (!undoStack.length) return; redoStack.push(snapNow()); restoreSnap(undoStack.pop()); }
+  function redo() { if (!redoStack.length) return; undoStack.push(snapNow()); restoreSnap(redoStack.pop()); }
+  // stickers are only deleted for good when you leave Decorate, so Undo can bring them back
+  async function cleanAssets(keepItems) {
+    const used = new Set(keepItems.filter(i => i.kind === "image").map(i => i.ref));
+    for (const id of state.decoAssets || []) if (!used.has(id)) { await store.delAsset(id); delete assets[id]; }
+    state.decoAssets = [];
+  }
+
   async function removeItem(id) {
+    checkpoint();
     const it = col.items.find(i => i.id === id);
     col.items = col.items.filter(i => i.id !== id);
     itemEl(id)?.remove();
-    if (it?.kind === "image") await store.delAsset(it.ref);
+    if (it?.kind === "image") (state.decoAssets ||= []).push(it.ref);
     select(null); fitBoard(); saveCollage();
   }
   const step5 = () => col.items.filter(i => i.kind !== "photo").length % 5; // new items step aside so they don't stack
@@ -678,6 +709,7 @@ export async function mount(root, state) {
     return clamp((innerHeight * .35 - top) / bw, .03, Math.max(.03, boardEl.clientHeight / bw - .2)) + step5() * .045;
   }
   function addItem(kind) {
+    checkpoint();
     const base = { id: newId(), kind, rot: Math.round(Math.random() * 8 - 4), z: topZ() + 1, y: dropY() };
     const it = kind === "text"
       ? { ...base, x: .14 + step5() * .05, w: .55, fs: .06, text: "", font: "hand", color: COLORS[0], bold: false, hl: null, tape: false }
@@ -701,6 +733,8 @@ export async function mount(root, state) {
       c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
       const out = await new Promise(r => c.toBlob(r, keepAlpha ? "image/png" : "image/jpeg", .88));
       const id = newId();
+      checkpoint();
+      (state.decoAssets ||= []).push(id);
       const a = { id, blob: out, source, added: Date.now() };
       await store.putAsset(a); assets[id] = a;
       const ratio = c.height / c.width;
@@ -723,6 +757,7 @@ export async function mount(root, state) {
   }
 
   function startTextEdit(el, it) {
+    if (it.text) checkpoint(); // new text boxes already saved a step when added
     const t = el.querySelector(".ctext");
     t.contentEditable = "true"; t.focus();
     const r = document.createRange(); r.selectNodeContents(t); r.collapse(false);
@@ -763,8 +798,10 @@ export async function mount(root, state) {
       const dx = (e.clientX - drag.sx) / drag.bw, dy = (e.clientY - drag.sy) / drag.bw;
       if (Math.abs(dx) + Math.abs(dy) > .008) drag.moved = true;
       if (!drag.moved) return;
+      if (!drag.cp) { drag.cp = true; checkpoint(); }
       it.x = clamp(drag.x0 + dx, -.15, .95); it.y = Math.max(-.05, drag.y0 + dy);
     } else {
+      if (!drag.cp) { drag.cp = true; checkpoint(); }
       const a = Math.atan2(e.clientY - drag.cy, e.clientX - drag.cx), d = Math.hypot(e.clientX - drag.cx, e.clientY - drag.cy);
       it.rot = drag.rot0 + (a - drag.a0) * 180 / Math.PI;
       it.w = clamp(drag.w0 * d / drag.d0, .06, 1.1);
@@ -810,7 +847,12 @@ export async function mount(root, state) {
       ${panel ? `<div class="decopanel"><div class="decoscroll">${panel}</div></div>` : ""}
       <div class="decorow">
         <div class="decotabs" role="tablist">${tabsFor.map(([k, n]) => `<button role="tab" class="dtab" data-dtab="${k}" aria-selected="${decoTab === k}">${n}</button>`).join("") || `<span class="typed dt-note">${it?.kind === "image" ? "Photo sticker" : it?.kind === "tape" ? "Tape" : ""}</span>`}</div>
-        ${b('class="done" data-deco="done"', "Done")}
+        <div class="deco-end">
+          ${b(`data-deco="undo" class="icon" aria-label="Undo" title="Undo"${undoStack.length ? "" : " disabled"}`, UNDO_ICON)}
+          ${b(`data-deco="redo" class="icon" aria-label="Redo" title="Redo"${redoStack.length ? "" : " disabled"}`, REDO_ICON)}
+          ${b('class="cancel" data-deco="cancel"', "Cancel")}
+          ${b('class="done" data-deco="done"', "Done")}
+        </div>
       </div>`;
     if (keep) {
       const sc = bar.querySelector(".decoscroll"); if (sc) sc.scrollLeft = keep.p;
@@ -822,20 +864,43 @@ export async function mount(root, state) {
     if (a === "done") {
       if (document.activeElement?.isContentEditable) document.activeElement.blur();
       await saveCollage(true);
-      state.decorating = false; selectedId = null; render();
+      await cleanAssets(col.items);
+      state.decorating = false; state.decoSnap = null; selectedId = null; undoStack = []; redoStack = []; render();
+    }
+    else if (a === "undo") undo();
+    else if (a === "redo") redo();
+    else if (a === "cancel") {
+      const changedAny = undoStack.length || JSON.stringify(snapNow()) !== JSON.stringify(state.decoSnap);
+      if (changedAny && !t.classList.contains("danger-armed")) {
+        t.classList.add("danger-armed"); t.textContent = "Tap again to discard";
+        setTimeout(() => { if (t.isConnected) { t.classList.remove("danger-armed"); t.textContent = "Cancel"; } }, 3000);
+        return;
+      }
+      if (document.activeElement?.isContentEditable) document.activeElement.blur();
+      clearTimeout(colTimer); // a pending save must not land after the discard
+      const sn = state.decoSnap;
+      if (sn) {
+        col.items = structuredClone(sn.items);
+        await store.patchDay(colKey, { collage: { items: col.items }, paper: sn.paper === "card" ? undefined : sn.paper });
+        paperNow = sn.paper; changed();
+      }
+      await cleanAssets(col.items);
+      state.decorating = false; state.decoSnap = null; selectedId = null; undoStack = []; redoStack = []; render();
     }
     else if (a === "text" || a === "tape") addItem(a);
     else if (a === "photo") { stickerInput.value = ""; stickerInput.click(); }
     else if (a === "paste") pasteFromClipboard();
     else if (a === "commons") openCommons();
     else if (a === "tidy") {
+      checkpoint();
       col.items.forEach(i => { if (i.kind === "photo") i.auto = true; });
       drawBoard(); saveCollage();
     }
-    else if (a === "outline" && it) { it.outline = !it.outline; redrawItem(it); select(it.id); saveCollage(); }
+    else if (a === "outline" && it) { checkpoint(); it.outline = !it.outline; redrawItem(it); select(it.id); saveCollage(); }
   }
   function layerAction(how) {
     const it = col.items.find(i => i.id === selectedId); if (!it) return;
+    checkpoint();
     const order = [...col.items].sort((a, b) => (a.z || 0) - (b.z || 0));
     const i = order.indexOf(it);
     order.splice(i, 1);
@@ -848,10 +913,12 @@ export async function mount(root, state) {
   const curPaper = () => paperNow;
   function photoAction(t) {
     const it = col.items.find(i => i.id === selectedId); if (!it) return;
+    checkpoint();
     it[t.dataset.ph] = t.dataset.v;
     redrawItem(it); select(it.id); saveCollage();
   }
-  async function setPaper(v) {
+  async function setPaper(v, record = true) {
+    if (record && v !== paperNow) checkpoint();
     paperNow = v;
     const pw = root.querySelector("#pagewrap"); if (pw) pw.className = `pagewrap paper-${v}`;
     await store.patchDay(colKey, { paper: v === "card" ? undefined : v }); changed();
@@ -859,6 +926,7 @@ export async function mount(root, state) {
   }
   function textAction(t) {
     const it = col.items.find(i => i.id === selectedId); if (!it) return;
+    checkpoint();
     const k = t.dataset.tx, v = t.dataset.v;
     if (k === "font") it.font = v;
     else if (k === "bold") it.bold = !it.bold;
@@ -1141,6 +1209,9 @@ export async function mount(root, state) {
     else if (has("data-import")) { importInput.value = ""; importInput.click(); }
     else if (has("data-decorate")) {
       await flushText();
+      state.decoSnap = col ? { items: structuredClone(col.items), paper: paperNow } : null;
+      state.decoAssets = [];
+      undoStack = []; redoStack = [];
       // lock photos where they are now, so decorations line up the same on phone, iPad and computer
       if (col?.items.some(i => i.kind === "photo" && i.auto)) { col.items.forEach(i => { if (i.kind === "photo") delete i.auto; }); await saveCollage(true); }
       state.decorating = true; selectedId = null; render();
@@ -1252,6 +1323,9 @@ export async function mount(root, state) {
       const it = col?.items.find(i => i.id === selectedId); if (it && it.kind !== "photo") removeItem(it.id);
     }
     if (sheetEl && e.key === "Escape") { closeCommons(); return; }
+    if (state.decorating && (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "z" && !document.activeElement?.isContentEditable) {
+      e.preventDefault(); e.shiftKey ? redo() : undo(); return;
+    }
     if (!viewerEl) {
       const typing = e.target.closest?.("textarea, input, [contenteditable='true']");
       if (!typing && !sheetEl && !state.decorating && route().page === "day" && (e.key === "ArrowLeft" || e.key === "ArrowRight")) goDay(e.key === "ArrowLeft" ? -1 : 1);

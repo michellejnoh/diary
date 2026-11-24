@@ -348,6 +348,12 @@ html, body { overflow-x: clip; }
 .decobar .hl-dot::after { content: ""; width: 20px; height: 11px; background: var(--c); transform: rotate(-8deg); opacity: .85; }
 .decobar .hl-none::after { content: ""; width: 18px; height: 2px; background: var(--pencil); transform: rotate(-35deg); }
 .decobar .tape-swatch { display: block; width: 30px; height: 10px; background: var(--tape); background-image: var(--grain); transform: rotate(-6deg); box-shadow: 0 0 0 .5px rgba(44,43,39,.15); }
+.deco-end { flex: none; display: flex; gap: 6px; align-items: center; }
+.decobar .icon { min-width: 40px; width: 40px; padding: 0; }
+.decobar .icon svg { width: 20px; height: 20px; }
+.decobar button:disabled { opacity: .35; cursor: default; }
+.decobar .cancel { padding: 0 10px; }
+.decobar .cancel.danger-armed { color: #A3341B; border-color: #A3341B; }
 .decobar .done { flex: none; background: var(--ink); color: var(--paper); border-color: var(--ink); padding: 0 18px; }
 
 /* Wikimedia picker */
