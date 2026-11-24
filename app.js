@@ -1,4 +1,4 @@
-export const VERSION = "29"; // bump on every change; shown at the bottom of Archive
+export const VERSION = "30"; // bump on every change; shown at the bottom of Archive
 // diary — app code. Loaded (and hot-swapped) by index.html.
 // mount(root, state) draws the app and returns an unmount function.
 
@@ -167,8 +167,8 @@ const LAYER_ICONS = (() => {
     back: svg(`${sq(4, false)}${sq(9, false)}${sq(14, true)}`),
   };
 })();
-const UNDO_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 7L4.5 11.5 9 16"/><path d="M5 11.5h9a5 5 0 0 1 0 10h-3"/></svg>`;
-const REDO_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 7l4.5 4.5L15 16"/><path d="M19 11.5h-9a5 5 0 0 0 0 10h3"/></svg>`;
+const UNDO_ICON = `<span class="glyph" aria-hidden="true">↶</span>`;
+const REDO_ICON = `<span class="glyph" aria-hidden="true">↷</span>`;
 const ROTATE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18.5 9.5a7 7 0 1 0 .8 5.6"/><path d="M19 4.5v5h-5"/></svg>`;
 
 // ---------- backup bookkeeping ----------
