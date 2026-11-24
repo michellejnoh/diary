@@ -39,8 +39,10 @@ html { -webkit-text-size-adjust: 100%; background-color: var(--card); }
 body {
   margin: 0;
   background-color: var(--card);
-  background-image: var(--grain-even), var(--mottle-even);
-  background-blend-mode: soft-light, soft-light; /* texture without shifting the overall color */
+  /* the top layer fades the texture in, so the flat browser bar flows into the page without a line */
+  background-image: linear-gradient(var(--card) 0, rgba(213,215,206,.85) 40px, rgba(213,215,206,0) 150px), var(--grain-even), var(--mottle-even);
+  background-size: 100% 150px, auto, auto; background-repeat: no-repeat, repeat, repeat;
+  background-blend-mode: normal, soft-light, soft-light; /* texture without shifting the overall color */
   color: var(--ink);
   font: 400 16px/1.5 var(--type);
   word-break: keep-all; overflow-wrap: anywhere; /* Korean wraps between words */
@@ -52,9 +54,9 @@ button { cursor: pointer; }
 a { color: inherit; }
 :focus-visible { outline: 2px dashed var(--ink); outline-offset: 3px; }
 
-.wrap { max-width: 1100px; margin: 0 auto; padding: 22px 18px 64px; }
+.wrap { max-width: 1100px; margin: 0 auto; padding: 10px 18px 64px; }
 
-header.top { display: flex; align-items: baseline; justify-content: space-between; padding: 4px 0 26px; }
+header.top { display: flex; align-items: center; justify-content: space-between; padding: 0 0 12px; }
 /* letterpress: inked metal type pressed into the card */
 .press {
   font-family: var(--press); color: #26251F;
