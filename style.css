@@ -163,10 +163,10 @@ header.top { display: flex; align-items: baseline; justify-content: space-betwee
 .add-tile {
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
   width: 100%; aspect-ratio: 4 / 5; padding: 12px; margin-top: 7px;
-  border: 1.5px dashed rgba(44,43,39,.38); background: rgba(247,245,239,.16); border-radius: 2px;
+  border: 0; background: var(--card-deep); border-radius: 2px;
   color: var(--ink); font: 400 15px/1.3 var(--type); text-align: center;
 }
-.add-tile:hover { background: rgba(247,245,239,.32); }
+.add-tile:hover { background: #BCC0B4; }
 .add-tile .cam { width: 50px; height: auto; color: var(--ink); }
 
 /* ---------- day heading ---------- */
@@ -203,12 +203,12 @@ header.top { display: flex; align-items: baseline; justify-content: space-betwee
 .board.paper-album .caption, .board.paper-album .ccap { color: #EEEBE2; }
 .board.paper-album .caption::placeholder { color: #A9A79E; }
 .board.paper-album .time { color: #A9A79E; }
-.board.paper-album .add-tile { color: #EEEBE2; border-color: rgba(238,235,226,.4); }
+.board.paper-album .add-tile { color: #EEEBE2; background: #3A3935; }
 .board.paper-album .add-tile .cam { color: #EEEBE2; }
 .board.paper-album .link { color: #C9C6BC; }
 .board.paper-kraft .time { color: #5E4B30; }
 .board.paper-kraft .caption::placeholder { color: #5E4B30; opacity: .75; }
-.board.paper-kraft .add-tile { border-color: rgba(60,45,25,.45); }
+.board.paper-kraft .add-tile { background: #B39468; }
 .board.editing.paper-album { background-image: radial-gradient(rgba(238,235,226,.18) 1px, transparent 1.2px); }
 
 /* ---------- photo frames ---------- */
