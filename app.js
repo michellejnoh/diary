@@ -1,4 +1,4 @@
-export const VERSION = "15"; // bump on every change; shown at the bottom of Archive
+export const VERSION = "16"; // bump on every change; shown at the bottom of Archive
 // diary — app code. Loaded (and hot-swapped) by index.html.
 // mount(root, state) draws the app and returns an unmount function.
 
@@ -151,14 +151,8 @@ function stampSVG(k) {
 }
 
 const ROUGH = `<filter id="rough" x="-10%" y="-10%" width="120%" height="120%"><feTurbulence type="fractalNoise" baseFrequency=".05" numOctaves="2" seed="3"/><feDisplacementMap in="SourceGraphic" scale="2.6"/></filter>`;
-const CAMERA = `<svg class="cam" viewBox="0 0 48 36" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><g filter="url(#rough)">
-  <path d="M5.2 11.6c3.6-.5 7.4-.1 9.5-.7l2.9-4.4c.5-.7 1.1-.9 1.8-.9l9.5.3c.7 0 1.2.4 1.6 1l2.6 4.1c3.5.3 6.7-.2 9.9.3.9.2 1.4.9 1.4 1.9l-.5 17.2c0 1-.7 1.6-1.7 1.7-12.7.5-25.3.1-37.9-.2-1 0-1.6-.8-1.6-1.8l-.6-16.7c0-.9.6-1.7 1.6-1.9z"/>
-  <path d="M24.4 14.3c4.3-.2 7.4 2.9 7.3 6.8-.1 4-3.4 6.9-7.4 6.8-4.2-.1-7.1-3.2-6.9-7.1.2-3.6 3-6.3 7-6.5z"/>
-  <path d="M22.6 13.8c5.1-.9 9.4 2.4 9.5 7" opacity=".55"/>
-  <path d="M24.2 18.1c1.7-.1 2.9 1.1 2.9 2.7 0 1.6-1.3 2.8-3 2.8-1.6 0-2.8-1.3-2.7-2.9.1-1.4 1.2-2.5 2.8-2.6z"/>
-  <path d="M36.8 15.4l3.5-.2"/><path d="M8.9 11l.3-2.4 3.5-.1.2 2.2"/>
-</g></svg>`;
-const PENCIL_LOOP = `<svg viewBox="0 0 120 50" preserveAspectRatio="none" aria-hidden="true"><path d="M14 30C9 16 34 6 64 6c28 0 49 7 49 20 0 14-26 21-56 21C27 47 6 39 8 25 10 14 33 9 52 8" fill="none" stroke="#2C2B27" stroke-width="1.5" stroke-linecap="round" filter="url(#rough)" opacity=".85"/></svg>`;
+const CAMERA = `<svg class="cam" viewBox="0 0 40 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><g filter="url(#rough)"><path d="M3.5 6.5h9l2.2-3h10.6l2.2 3h9v14h-33z"/><circle cx="20" cy="13.5" r="4.6"/></g></svg>`;
+const PENCIL = `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><g filter="url(#rough)"><path d="M4 20l1.2-4.4L15.8 5a1.9 1.9 0 0 1 2.7 0l.5.5a1.9 1.9 0 0 1 0 2.7L8.4 18.8z"/><path d="M13.8 7l3.2 3.2"/></g></svg>`;
 const ROTATE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18.5 9.5a7 7 0 1 0 .8 5.6"/><path d="M19 4.5v5h-5"/></svg>`;
 
 // ---------- backup bookkeeping ----------
@@ -385,7 +379,7 @@ export async function mount(root, state) {
             <h1 class="page-title day-title"><span class="date-scrap">${title}</span></h1>
             ${editing || isToday ? "" : `<a class="daynav" href="${hrefOf(nextK)}" data-nav="next" aria-label="Next day">›</a>`}
           </div>
-          ${editing ? `<span class="hint typed">Drag to move. Corner handle turns and resizes.</span>` : `<button class="pencilbtn" data-decorate>Decorate${PENCIL_LOOP}</button>`}
+          ${editing ? `<span class="hint typed">Drag to move. Corner handle turns and resizes.</span>` : `<button class="slipbtn" data-decorate>${PENCIL}<span>Decorate</span></button>`}
         </div>
         <div class="board paper-${paper}${editing ? " editing" : ""}" id="board"></div>
         <div class="slip">
@@ -678,36 +672,33 @@ export async function mount(root, state) {
   }
 
   // ---------- decorate toolbar ----------
+  let decoTab = null, decoKind = null;
   function renderDecoBar() {
     const bar = root.querySelector(".decobar"); if (!bar) return;
     const it = col?.items.find(i => i.id === selectedId);
+    const kind = it?.kind || "none";
+    const tabsFor = { none: [["add", "Add"], ["page", "Page"]], text: [["style", "Style"], ["color", "Color"], ["marker", "Marker"]], photo: [["frame", "Frame"], ["look", "Look"]], image: [], tape: [] }[kind];
+    if (kind !== decoKind) { decoKind = kind; decoTab = tabsFor[0]?.[0] || null; }
     const b = (attrs, label, pressed) => `<button ${attrs}${pressed != null ? ` aria-pressed="${!!pressed}"` : ""}>${label}</button>`;
-    let html;
-    if (it?.kind === "text") {
-      html = `
-        <span class="group">${[["hand", "Hand"], ["type", "Type"], ["press", "Press"]].map(([f, n]) => b(`data-tx="font" data-v="${f}" class="f-${f}"`, n, (it.font || "hand") === f)).join("")}</span>
-        <span class="group">${b('data-tx="bold" class="bold"', "B", it.bold)}</span>
-        <span class="group" aria-label="Color">${COLORS.map(c => b(`data-tx="color" data-v="${c}" class="dot" style="--c:${c}" aria-label="Color ${c}"`, "", (it.color || COLORS[0]) === c)).join("")}</span>
-        <span class="group" aria-label="Highlighter">${b('data-tx="hl" data-v="" class="hl-none" aria-label="No highlighter"', "", !it.hl)}${HILITES.map(c => b(`data-tx="hl" data-v="${c}" class="hl-dot" style="--c:${c}" aria-label="Highlighter ${c}"`, "", it.hl === c)).join("")}</span>
-        <span class="group">${b('data-tx="tape" class="tape-btn" aria-label="Tape behind text"', `<span class="tape-swatch"></span>`, it.tape)}</span>
-        ${b('data-deco="back"', "Send back")}`;
-    } else if (it?.kind === "photo") {
-      html = `
-        <span class="group" aria-label="Frame">${[["print", "Print"], ["instant", "Instant"], ["film", "Film"], ["torn", "Torn"]].map(([f, n]) => b(`data-ph="frame" data-v="${f}"`, n, (it.frame || "print") === f)).join("")}</span>
-        <span class="group" aria-label="Look">${[["none", "Plain"], ["grain", "Grain"], ["warm", "Warm"], ["bw", "B&amp;W"]].map(([f, n]) => b(`data-ph="look" data-v="${f}"`, n, (it.look || "none") === f)).join("")}</span>
-        ${b('data-deco="back"', "Send back")}`;
-    } else {
-      const paper = curPaper();
-      html = `
-        ${b('data-deco="text"', "Text")}
-        ${b('data-deco="tape" aria-label="Tape"', `<span class="tape-swatch"></span>`)}
-        ${b('data-deco="photo"', "Photo")}
-        ${b('data-deco="paste"', "Paste")}
-        ${b('data-deco="commons"', "Wikimedia")}
-        ${it?.kind === "image" ? b('data-deco="outline"', "Outline", it.outline) : ""}
-        ${it ? b('data-deco="back"', "Send back") : `<span class="group" aria-label="Paper">${[["card", "Card"], ["kraft", "Kraft"], ["grid", "Grid"], ["album", "Album"]].map(([f, n]) => b(`data-paper="${f}" class="paper-btn pb-${f}"`, n, paper === f)).join("")}</span>${b('data-deco="tidy"', "Tidy up")}<span class="group" aria-label="Look">${[["neat", "Neat"], ["loose", "Loose"]].map(([f, n]) => b(`data-look="${f}"`, n, lookNow() === f)).join("")}</span>`}`;
-    }
-    bar.innerHTML = `<div class="decoscroll">${html}</div>${b('class="done" data-deco="done"', "Done")}`;
+    const opt = {
+      add: () => `${b('data-deco="text"', "Text")}${b('data-deco="tape" aria-label="Tape"', `<span class="tape-swatch"></span> Tape`)}${b('data-deco="photo"', "Photo")}${b('data-deco="paste"', "Paste")}${b('data-deco="commons"', "Wikimedia")}`,
+      page: () => `<span class="group">${[["card", "Card"], ["kraft", "Kraft"], ["grid", "Grid"], ["album", "Album"]].map(([f, n]) => b(`data-paper="${f}" class="paper-btn pb-${f}"`, n, curPaper() === f)).join("")}</span>
+        <span class="group">${[["neat", "Neat"], ["loose", "Loose"]].map(([f, n]) => b(`data-look="${f}"`, n, lookNow() === f)).join("")}</span>${b('data-deco="tidy"', "Tidy up")}`,
+      style: () => `<span class="group">${[["hand", "Hand"], ["type", "Type"], ["press", "Press"]].map(([f, n]) => b(`data-tx="font" data-v="${f}" class="f-${f}"`, n, (it.font || "hand") === f)).join("")}</span>
+        ${b('data-tx="bold" class="bold"', "B", it.bold)}${b('data-tx="tape" aria-label="Tape behind text"', `<span class="tape-swatch"></span>`, it.tape)}`,
+      color: () => COLORS.map(c => b(`data-tx="color" data-v="${c}" class="dot" style="--c:${c}" aria-label="Color ${c}"`, "", (it.color || COLORS[0]) === c)).join(""),
+      marker: () => b('data-tx="hl" data-v="" class="hl-none" aria-label="No highlighter"', "", !it.hl) + HILITES.map(c => b(`data-tx="hl" data-v="${c}" class="hl-dot" style="--c:${c}" aria-label="Highlighter ${c}"`, "", it.hl === c)).join(""),
+      frame: () => [["print", "Print"], ["instant", "Instant"], ["film", "Film"], ["torn", "Torn"]].map(([f, n]) => b(`data-ph="frame" data-v="${f}"`, n, (it.frame || "print") === f)).join(""),
+      look: () => [["none", "Plain"], ["grain", "Grain"], ["warm", "Warm"], ["bw", "B&amp;W"]].map(([f, n]) => b(`data-ph="look" data-v="${f}"`, n, (it.look || "none") === f)).join(""),
+    };
+    const actions = (it ? (it.kind === "image" ? b('data-deco="outline"', "Outline", it.outline) : "") + b('data-deco="back"', "Send back") : "");
+    const panel = (decoTab ? opt[decoTab]() : "") + (actions ? `<span class="group-sep"></span>${actions}` : "");
+    bar.innerHTML = `
+      ${panel ? `<div class="decopanel"><div class="decoscroll">${panel}</div></div>` : ""}
+      <div class="decorow">
+        <div class="decotabs" role="tablist">${tabsFor.map(([k, n]) => `<button role="tab" class="dtab" data-dtab="${k}" aria-selected="${decoTab === k}">${n}</button>`).join("") || `<span class="typed dt-note">${it?.kind === "image" ? "Photo sticker" : it?.kind === "tape" ? "Tape" : ""}</span>`}</div>
+        ${b('class="done" data-deco="done"', "Done")}
+      </div>`;
   }
   async function decoAction(a, t) {
     const it = col.items.find(i => i.id === selectedId);
@@ -1023,7 +1014,7 @@ export async function mount(root, state) {
 
   // ---------- events (all removed on unmount) ----------
   on(document, "click", async e => {
-    const t = e.target.closest("[data-camera],[data-library],[data-open],[data-close],[data-step],[data-delete],[data-export],[data-import],[data-folder],[data-resume],[data-stopfolder],[data-importfolder],[data-font],[data-decorate],[data-deco],[data-tx],[data-sheet-close],[data-pick],[data-ph],[data-paper],[data-nav],[data-look]");
+    const t = e.target.closest("[data-camera],[data-library],[data-open],[data-close],[data-step],[data-delete],[data-export],[data-import],[data-folder],[data-resume],[data-stopfolder],[data-importfolder],[data-font],[data-decorate],[data-deco],[data-tx],[data-sheet-close],[data-pick],[data-ph],[data-paper],[data-nav],[data-look],[data-dtab]");
     if (!t) {
       if (viewerEl && e.target.classList?.contains("stage")) closeViewer();
       if (sheetEl && e.target === sheetEl) closeCommons();
@@ -1041,6 +1032,7 @@ export async function mount(root, state) {
     else if (t.dataset.deco) decoAction(t.dataset.deco, t);
     else if (t.dataset.tx) textAction(t);
     else if (t.dataset.ph) photoAction(t);
+    else if (t.dataset.dtab) { decoTab = decoTab === t.dataset.dtab ? null : t.dataset.dtab; renderDecoBar(); }
     else if (t.dataset.paper) setPaper(t.dataset.paper);
     else if (t.dataset.look) {
       try { localStorage.setItem(LOOK, t.dataset.look); } catch {}
