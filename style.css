@@ -206,9 +206,20 @@ html, body { overflow-x: clip; }
 .pagewrap.paper-kraft .time { color: #5E4B30; }
 .pagewrap.paper-kraft .caption::placeholder { color: #5E4B30; opacity: .75; }
 .pagewrap.paper-kraft .add-tile { background: #B39468; }
-.paper-album 
 /* ---------- photo frames ---------- */
-.ci-photo.fr-instant .frame { padding: 4.5cqw 4.5cqw 20cqw; }
+/* Instant: one white card from the photo down past the note, with a deep bottom like a Polaroid */
+.ci-photo.fr-instant {
+  background: var(--paper); padding: calc(var(--bw) * var(--w) * .05) calc(var(--bw) * var(--w) * .05) calc(var(--bw) * var(--w) * .07);
+  box-shadow: 0 1px 1px rgba(40,40,34,.2), 0 8px 18px -10px rgba(40,40,34,.5);
+}
+.ci-photo.fr-instant .frame { padding: 0; background: none; box-shadow: none !important; }
+.ci-photo.fr-instant .frame::after { display: none; }
+.ci-photo.fr-instant::after { content: ""; position: absolute; inset: 0; background-image: var(--grain); opacity: .35; mix-blend-mode: multiply; pointer-events: none; }
+.ci-photo.fr-instant .cap, .ci-photo.fr-instant .ccap { min-height: calc(var(--bw) * var(--w) * .2); padding: calc(var(--bw) * var(--w) * .04) 2px 0; margin: 0; }
+.ci-photo.fr-instant .tape { top: calc(var(--bw) * var(--w) * -.035); }
+.pagewrap.paper-album .ci-photo.fr-instant .caption, .pagewrap.paper-album .ci-photo.fr-instant .ccap { color: var(--ink); }
+.pagewrap.paper-album .ci-photo.fr-instant .time { color: var(--pencil); }
+.look-loose .ci-photo.fr-instant { box-shadow: 0 1px 1px rgba(40,40,34,.2), 0 calc(5px + 7px * var(--lift, 1)) calc(10px + 12px * var(--lift, 1)) calc(-6px - 6px * var(--lift, 1)) rgba(40,40,34,calc(.28 + .2 * var(--lift, 1))); }
 .ci-photo.fr-film .frame {
   padding: 11cqw 2.5cqw;
   background:

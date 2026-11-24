@@ -1,4 +1,4 @@
-export const VERSION = "28"; // bump on every change; shown at the bottom of Archive
+export const VERSION = "29"; // bump on every change; shown at the bottom of Archive
 // diary — app code. Loaded (and hot-swapped) by index.html.
 // mount(root, state) draws the app and returns an unmount function.
 
@@ -551,7 +551,7 @@ export async function mount(root, state) {
     const handles = editing ? `<span class="h-rot" data-h="t" title="Turn and resize">${ROTATE_ICON}</span>${i.kind !== "photo" ? `<button class="h-del" data-h="d" aria-label="Remove">×</button>` : ""}` : "";
     const extra = (i.kind === "image" && i.outline ? " outline" : "") + (i.kind === "photo" ? ` fr-${i.frame || "print"} lk-${i.look || "none"}` : "");
     const seed = [...i.id].reduce((a, ch) => a + ch.charCodeAt(0), 0);
-    const vars = i.kind === "photo" ? `;--lift:${(.6 + rnd(seed, 6) * .9).toFixed(2)};--tape-x:${(35 + rnd(seed, 7) * 30).toFixed(0)}%;--tape-r:${((rnd(seed, 8) - .5) * 14).toFixed(1)}deg` : "";
+    const vars = i.kind === "photo" ? `;--w:${i.w};--lift:${(.6 + rnd(seed, 6) * .9).toFixed(2)};--tape-x:${(35 + rnd(seed, 7) * 30).toFixed(0)}%;--tape-r:${((rnd(seed, 8) - .5) * 14).toFixed(1)}deg` : "";
     const rd = i.auto && rowOf.has(i.id) ? ` data-row="${rowOf.get(i.id)[0]}" data-drop="${rowOf.get(i.id)[1]}"` : "";
     return `<div class="ci ci-${i.kind}${extra}${i.id === selectedId ? " sel" : ""}" data-id="${i.id}"${rd} style="${pos(i)}${vars}">${inner}${handles}</div>`;
   }
@@ -914,8 +914,21 @@ export async function mount(root, state) {
   function photoAction(t) {
     const it = col.items.find(i => i.id === selectedId); if (!it) return;
     checkpoint();
+    const before = itemEl(it.id), bw = boardEl.clientWidth;
+    const oldH = before.offsetHeight, oldBottom = before.offsetTop + oldH, l = before.offsetLeft, r = l + before.offsetWidth;
     it[t.dataset.ph] = t.dataset.v;
-    redrawItem(it); select(it.id); saveCollage();
+    redrawItem(it); select(it.id);
+    const delta = itemEl(it.id).offsetHeight - oldH;
+    if (Math.abs(delta) > 1) {
+      col.items.forEach(o => {
+        if (o === it) return;
+        const el = itemEl(o.id); if (!el) return;
+        const ol = el.offsetLeft, or = ol + el.offsetWidth;
+        if (el.offsetTop >= oldBottom - 12 && ol < r && or > l) { o.y += delta / bw; applyPos(el, o); }
+      });
+      fitBoard();
+    }
+    saveCollage();
   }
   async function setPaper(v, record = true) {
     if (record && v !== paperNow) checkpoint();
