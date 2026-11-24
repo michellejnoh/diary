@@ -1,4 +1,4 @@
-export const VERSION = "20"; // bump on every change; shown at the bottom of Archive
+export const VERSION = "21"; // bump on every change; shown at the bottom of Archive
 // diary — app code. Loaded (and hot-swapped) by index.html.
 // mount(root, state) draws the app and returns an unmount function.
 
@@ -190,7 +190,7 @@ const EN_FONTS = [
   { key: "indieflower", family: "Indie Flower", name: "Indie Flower" },
   { key: "ebgaramond", family: "EB Garamond", name: "EB Garamond" },
 ];
-const pickFont = (list, key) => list.find(f => f.key === key) || list[0];
+const pickFont = list => list[0]; // fixed pair: Caveat + Nanum Pen Script
 const getPref = (k, d) => { try { return localStorage.getItem(k) || d; } catch { return d; } };
 const fontsNow = () => ({
   ko: pickFont(KO_FONTS, getPref("diary.hand.ko", getPref("diary.hand", ""))),
@@ -348,11 +348,20 @@ export async function mount(root, state) {
   async function render() {
     await flushText();
     const old = urls; urls = [];
-    root.style.minHeight = root.offsetHeight + "px"; // hold the page height so nothing jumps while swapping
+    const oldH = root.offsetHeight;
+    root.style.minHeight = oldH + "px"; // hold the page height so nothing jumps while swapping
+    const flip = state.navDir;
     const r = route();
     if (r.page === "archive") await renderArchive(); else await renderDay(r.date);
     if (state.viewer && r.page === "day") openViewer(state.viewer, false);
-    requestAnimationFrame(() => { root.style.minHeight = ""; old.forEach(URL.revokeObjectURL); });
+    const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (flip && !reduce && r.page === "day") {
+      root.style.minHeight = Math.max(oldH, root.scrollHeight) + "px";
+      root.querySelectorAll(".dayhead, .pagewrap").forEach(el => el.classList.add(`slide-${flip}`));
+      if (scrollY > 0) window.scrollTo({ top: 0, behavior: "smooth" }); // glide up while it slides, so the release can't jump
+      const release = () => { if (scrollY > 2) return setTimeout(release, 60); root.style.minHeight = ""; old.forEach(URL.revokeObjectURL); };
+      setTimeout(release, 380);
+    } else requestAnimationFrame(() => { root.style.minHeight = ""; old.forEach(URL.revokeObjectURL); });
   }
 
   // ---------- day page: one board. Grid by default; Decorate to move things freely ----------
@@ -877,19 +886,7 @@ export async function mount(root, state) {
         <h1 class="page-title day-title">Archive</h1>
         <p class="summary">${photoTotal ? `${photoTotal} photo${photoTotal > 1 ? "s" : ""} over ${dates.length} day${dates.length > 1 ? "s" : ""}` : "Nothing here yet."}</p>
         <div class="months">${months}</div>
-        <details class="fonts" ${state.fontsOpen ? "open" : ""}>
-          <summary>Handwriting: <span id="handName">${fontsNow().ko.name} + ${fontsNow().en.name}</span></summary>
-          <p class="font-group">한글</p>
-          <div class="font-list">${KO_FONTS.map(f => `
-            <button class="font-opt" data-font="${f.key}" data-lang="ko" aria-pressed="${f.key === fontsNow().ko.key}">
-              <span class="sample" style="font-family:'${f.family}'">오늘의 기록</span><span class="name">${f.name}</span>
-            </button>`).join("")}</div>
-          <p class="font-group">English</p>
-          <div class="font-list">${EN_FONTS.map(f => `
-            <button class="font-opt" data-font="${f.key}" data-lang="en" aria-pressed="${f.key === fontsNow().en.key}">
-              <span class="sample" style="font-family:'${f.family}'">Today’s page</span><span class="name">${f.name}</span>
-            </button>`).join("")}</div>
-        </details>
+
         <div class="lookpick">
           <span class="typed">Page look</span>
           ${[["neat", "Neat grid"], ["loose", "Loose"]].map(([f, n]) => `<button class="chip" data-look="${f}" aria-pressed="${lookNow() === f}">${n}</button>`).join("")}

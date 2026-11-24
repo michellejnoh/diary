@@ -62,12 +62,12 @@ header.top { display: flex; align-items: baseline; justify-content: space-betwee
   -webkit-mask-image: var(--ink-wear); mask-image: var(--ink-wear); -webkit-mask-size: 160px; mask-size: 160px;
 }
 /* "diary": the very first look */
-.wordmark { font: 700 26px/1.1 "Spectral", Georgia, serif; letter-spacing: .01em; margin: 0; text-decoration: none; color: var(--ink); }
+.wordmark { font: 400 28px/1.1 "IM Fell English", Georgia, serif; -webkit-text-stroke: .5px currentColor; letter-spacing: .01em; margin: 0; text-decoration: none; color: var(--ink); }
 
-/* Archive / Today / Decorate: italic letterpress words on scraps of tape */
+/* Archive / Today: letterpress words on scraps of tape */
 .navtag {
   display: inline-block; border: 0; padding: 5px 13px 4px; cursor: pointer; text-decoration: none;
-  font: italic 400 15px/1.1 "IM Fell English", Georgia, serif; color: var(--ink);
+  font: 400 15px/1.1 "IM Fell English", Georgia, serif; color: var(--ink);
   background-color: var(--tape); background-image: var(--grain); background-blend-mode: multiply;
   clip-path: polygon(0 10%, 3% 0, 7% 9%, 11% 0, 89% 0, 93% 11%, 97% 0, 100% 9%, 100% 91%, 97% 100%, 93% 89%, 89% 100%, 11% 100%, 7% 90%, 3% 100%, 0 89%);
   transform: rotate(-2deg);
@@ -173,9 +173,10 @@ header.top { display: flex; align-items: baseline; justify-content: space-betwee
 /* one moment of motion: the page slides in from the side you swiped */
 @keyframes from-left { from { transform: translateX(-28px); opacity: .3; } to { transform: none; opacity: 1; } }
 @keyframes from-right { from { transform: translateX(28px); opacity: .3; } to { transform: none; opacity: 1; } }
-.wrap.slide-left { animation: from-right .32s ease-out; }
-.wrap.slide-right { animation: from-left .32s ease-out; }
-@media (prefers-reduced-motion: reduce) { .wrap.slide-left, .wrap.slide-right { animation: none; } }
+.slide-left { animation: from-right .34s cubic-bezier(.2,.7,.2,1); }
+.slide-right { animation: from-left .34s cubic-bezier(.2,.7,.2,1); }
+html, body { overflow-x: clip; }
+@media (prefers-reduced-motion: reduce) { .slide-left, .slide-right { animation: none; } }
 
 /* ---------- paper for the day ---------- */
 .pagewrap { position: relative; isolation: isolate; }
