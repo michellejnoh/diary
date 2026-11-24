@@ -533,8 +533,8 @@ img.cut, .cut-scrap {
 /* header proportions: big Diary with a small Archive beside it; the date large across the page; small Decorate under it on the right */
 .wordmark.cutmark { font-size: clamp(38px, 12vw, 54px); }
 header.top { padding-bottom: 12px; }
-.dayhead { display: block; margin-bottom: 22px; }
-.page-title.day-title.big-date { font-size: clamp(21px, 6.9vw, 34px); line-height: 1.2; margin: 0; white-space: nowrap; }
+.dayhead { display: block; width: max-content; max-width: 100%; margin-bottom: 22px; } /* Decorate lines up with the end of the date */
+.page-title.day-title.big-date { font-size: clamp(18px, 5.6vw, 27px); line-height: 1.2; margin: 0; white-space: nowrap; }
 .daysub { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 2px; min-height: 24px; }
 .daynavs { display: flex; gap: 6px; }
 .daysub [data-decorate] { margin-left: auto; font: italic 400 15px/1.3 var(--type); color: var(--ink); padding: 0; }
