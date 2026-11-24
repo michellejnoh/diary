@@ -1,4 +1,4 @@
-export const VERSION = "30"; // bump on every change; shown at the bottom of Archive
+export const VERSION = "31"; // bump on every change; shown at the bottom of Archive
 // diary — app code. Loaded (and hot-swapped) by index.html.
 // mount(root, state) draws the app and returns an unmount function.
 
@@ -536,7 +536,7 @@ export async function mount(root, state) {
       const time = keyOf(new Date(p.added)) === p.date ? `<span class="time">${timeOf(p.added)}</span>` : "";
       const img = `<span class="photo"><img src="${url(p.blob)}" alt="" draggable="false" class="${developIds.has(p.id) ? "developing" : ""}"></span>`;
       inner = `<span class="tape" aria-hidden="true"></span>` + (editing
-        ? `<div class="frame">${img}</div>${p.caption ? `<p class="ccap">${esc(p.caption)}</p>` : ""}`
+        ? `<div class="frame">${img}</div><div class="cap">${time}<p class="ccap${p.caption ? "" : " empty"}">${esc(p.caption || "write about this one")}</p></div>`
         : `<button class="frame" data-open="${p.id}" aria-label="Open photo">${img}</button>
            <div class="cap">${time}<label class="sr" for="cap-${p.id}">Note for this photo</label><textarea class="caption" id="cap-${p.id}" data-cap="${p.id}" rows="1" placeholder="write about this one">${esc(p.caption)}</textarea></div>`);
     } else if (i.kind === "text") {

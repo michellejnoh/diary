@@ -285,6 +285,9 @@ html, body { overflow-x: clip; }
 .ccap { margin: 3cqw 2cqw 0; font: 400 clamp(16px, 8.5cqw, 26px)/1.2 var(--hand); color: var(--ink); white-space: pre-wrap; }
 .ci-photo .frame { width: 100%; border: 0; }
 .ci-photo .cap { padding: 2.5cqw 2cqw 0; }
+/* in Decorate the note shows as plain text but takes the same room as the text box, so spacing matches */
+.ci-photo .cap .ccap { margin: 0; font-size: clamp(16px, 8.5cqw, 26px); line-height: 1.15; min-height: 1.2em; }
+.ci-photo .cap .ccap.empty { color: var(--pencil); opacity: .55; }
 .ci-photo .caption { font-size: clamp(16px, 8.5cqw, 26px); }
 .ci-photo .time { margin-bottom: 1px; }
 .ci-add { display: flex; flex-direction: column; align-items: center; gap: 6px; }
