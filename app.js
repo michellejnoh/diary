@@ -1,4 +1,4 @@
-export const VERSION = "16"; // bump on every change; shown at the bottom of Archive
+export const VERSION = "17"; // bump on every change; shown at the bottom of Archive
 // diary — app code. Loaded (and hot-swapped) by index.html.
 // mount(root, state) draws the app and returns an unmount function.
 
@@ -370,23 +370,24 @@ export async function mount(root, state) {
     root.innerHTML = `
       <div class="wrap${editing ? " decorating" : ""}${slide}">
         <header class="top">
-          <a class="wordmark press" href="#/">Diary</a>
+          <a class="wordmark" href="#/">diary</a>
           <a class="navtag" href="#/archive">Archive</a>
         </header>
         <div class="dayhead">
           <div class="daytitle">
             ${editing ? "" : `<a class="daynav" href="${hrefOf(prevK)}" data-nav="prev" aria-label="Previous day">‹</a>`}
-            <h1 class="page-title day-title"><span class="date-scrap">${title}</span></h1>
+            <h1 class="page-title day-title">${title}</h1>
             ${editing || isToday ? "" : `<a class="daynav" href="${hrefOf(nextK)}" data-nav="next" aria-label="Next day">›</a>`}
           </div>
-          ${editing ? `<span class="hint typed">Drag to move. Corner handle turns and resizes.</span>` : `<button class="slipbtn" data-decorate>${PENCIL}<span>Decorate</span></button>`}
+          ${editing ? `<span class="hint typed">Drag to move. Corner handle turns and resizes.</span>` : `<button class="link" data-decorate>Decorate</button>`}
         </div>
-        <div class="board paper-${paper}${editing ? " editing" : ""}" id="board"></div>
+        <div class="pagewrap paper-${paper}" id="pagewrap">
+        <div class="board${editing ? " editing" : ""}" id="board"></div>
         <div class="slip">
           <span class="tape" aria-hidden="true"></span>
-          <span class="slip-paper" aria-hidden="true"></span>
           <label class="sr" for="note">About the day</label>
           <textarea class="note" id="note" rows="3" placeholder="how was today?">${esc(day.note || "")}</textarea>
+        </div>
         </div>
         ${editing ? "" : backupLine()}
       </div>
@@ -731,7 +732,7 @@ export async function mount(root, state) {
   }
   async function setPaper(v) {
     paperNow = v;
-    boardEl.className = boardEl.className.replace(/paper-\w+/, `paper-${v}`);
+    const pw = root.querySelector("#pagewrap"); if (pw) pw.className = `pagewrap paper-${v}`;
     await store.patchDay(colKey, { paper: v === "card" ? undefined : v }); changed();
     renderDecoBar();
   }
@@ -843,7 +844,7 @@ export async function mount(root, state) {
     root.innerHTML = `
       <div class="wrap">
         <header class="top">
-          <a class="wordmark press" href="#/">Diary</a>
+          <a class="wordmark" href="#/">diary</a>
           <a class="navtag" href="#/">Today</a>
         </header>
         <h1 class="page-title day-title">Archive</h1>
