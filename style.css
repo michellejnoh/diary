@@ -69,6 +69,9 @@ header.top { display: flex; align-items: baseline; justify-content: space-betwee
 
 .page-title { margin: 0 0 30px; font-size: 30px; font-weight: 400; line-height: 1.2; }
 .page-title .soft { opacity: .62; }
+/* day heading stays typewritten */
+.page-title.day-title { font: 400 23px/1.3 var(--type); }
+.page-title.day-title .soft { opacity: 1; color: var(--pencil); }
 
 /* ---------- the day's roll ---------- */
 .roll {

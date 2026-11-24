@@ -1,4 +1,4 @@
-export const VERSION = "7"; // bump on every change; shown at the bottom of Archive
+export const VERSION = "8"; // bump on every change; shown at the bottom of Archive
 // diary — app code. Loaded (and hot-swapped) by index.html.
 // mount(root, state) draws the app and returns an unmount function.
 
@@ -344,7 +344,7 @@ export async function mount(root, state) {
           <a class="wordmark press" href="#/">diary</a>
           <a class="link" href="#/archive">${isToday ? "Archive" : "Back to archive"}</a>
         </header>
-        <h1 class="page-title press">${title}</h1>
+        <h1 class="page-title day-title">${title}</h1>
         <div class="roll">${prints}${add}</div>
         <div class="slip">
           <span class="tape" aria-hidden="true"></span>
