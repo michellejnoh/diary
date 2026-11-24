@@ -1,4 +1,4 @@
-export const VERSION = "17"; // bump on every change; shown at the bottom of Archive
+export const VERSION = "18"; // bump on every change; shown at the bottom of Archive
 // diary — app code. Loaded (and hot-swapped) by index.html.
 // mount(root, state) draws the app and returns an unmount function.
 
@@ -337,10 +337,12 @@ export async function mount(root, state) {
 
   async function render() {
     await flushText();
-    revoke();
+    const old = urls; urls = [];
+    root.style.minHeight = root.offsetHeight + "px"; // hold the page height so nothing jumps while swapping
     const r = route();
     if (r.page === "archive") await renderArchive(); else await renderDay(r.date);
     if (state.viewer && r.page === "day") openViewer(state.viewer, false);
+    requestAnimationFrame(() => { root.style.minHeight = ""; old.forEach(URL.revokeObjectURL); });
   }
 
   // ---------- day page: one board. Grid by default; Decorate to move things freely ----------
@@ -356,21 +358,23 @@ export async function mount(root, state) {
   async function renderDay(k) {
     const d = fromKey(k), isToday = k === todayKey();
     const [photos, day] = await Promise.all([store.photosOn(k), store.getDay(k)]);
+    const preAssets = await store.getAssets((day.collage?.items || []).filter(i => i.kind === "image").map(i => i.ref));
+    const flipping = !!state.navDir;
     dayPhotos = photos;
     const editing = !!state.decorating;
     const prevK = keyOf(new Date(d.getFullYear(), d.getMonth(), d.getDate() - 1));
     const nextK = keyOf(new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1));
     const hrefOf = k2 => k2 === todayKey() ? "#/" : `#/day/${k2}`;
-    const slide = state.navDir ? ` slide-${state.navDir}` : ""; state.navDir = null;
+    state.navDir = null;
     const paper = day.paper || "card";
     const title = isToday
       ? `<span class="soft">Today,</span> ${d.getDate()} ${MONTHS[d.getMonth()]}`
       : `<span class="soft">${WEEKDAYS[d.getDay()]},</span> ${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 
     root.innerHTML = `
-      <div class="wrap${editing ? " decorating" : ""}${slide}">
+      <div class="wrap${editing ? " decorating" : ""}">
         <header class="top">
-          <a class="wordmark" href="#/">diary</a>
+          <a class="wordmark" href="#/">Diary</a>
           <a class="navtag" href="#/archive">Archive</a>
         </header>
         <div class="dayhead">
@@ -393,9 +397,9 @@ export async function mount(root, state) {
       </div>
       ${editing ? `<div class="decobar" role="toolbar" aria-label="Decorate"></div>` : ""}`;
 
-    await mountBoard(k, day, photos);
+    mountBoard(k, day, photos, preAssets);
     root.querySelectorAll("textarea").forEach(grow);
-    window.scrollTo(0, state.scroll?.[location.hash] || 0);
+    if (!flipping) window.scrollTo(0, state.scroll?.[location.hash] || 0);
   }
   const grow = ta => { ta.style.height = "auto"; ta.style.height = ta.scrollHeight + "px"; };
 
@@ -498,7 +502,7 @@ export async function mount(root, state) {
     fitBoard();
   }
 
-  async function mountBoard(k, day, photos) {
+  function mountBoard(k, day, photos, preAssets) {
     teardownBoard();
     boardEl = root.querySelector("#board");
     colKey = k;
@@ -510,7 +514,7 @@ export async function mount(root, state) {
     for (const p of photos) if (!have.has(p.id)) items.push({ id: newId(), kind: "photo", ref: p.id, auto: true, z: ++z });
     col = { items };
     paperNow = day.paper || "card";
-    assets = await store.getAssets(items.filter(i => i.kind === "image").map(i => i.ref));
+    assets = preAssets || {};
     boardEl.style.setProperty("--bw", boardEl.clientWidth + "px");
     lastW = boardEl.clientWidth;
     drawBoard();
@@ -694,12 +698,20 @@ export async function mount(root, state) {
     };
     const actions = (it ? (it.kind === "image" ? b('data-deco="outline"', "Outline", it.outline) : "") + b('data-deco="back"', "Send back") : "");
     const panel = (decoTab ? opt[decoTab]() : "") + (actions ? `<span class="group-sep"></span>${actions}` : "");
+    // keep the option row where it was scrolled, as long as the same menu stays open
+    const keyNow = `${kind}:${decoTab}`;
+    const keep = bar.dataset.key === keyNow ? { p: bar.querySelector(".decoscroll")?.scrollLeft || 0, t: bar.querySelector(".decotabs")?.scrollLeft || 0 } : null;
+    bar.dataset.key = keyNow;
     bar.innerHTML = `
       ${panel ? `<div class="decopanel"><div class="decoscroll">${panel}</div></div>` : ""}
       <div class="decorow">
         <div class="decotabs" role="tablist">${tabsFor.map(([k, n]) => `<button role="tab" class="dtab" data-dtab="${k}" aria-selected="${decoTab === k}">${n}</button>`).join("") || `<span class="typed dt-note">${it?.kind === "image" ? "Photo sticker" : it?.kind === "tape" ? "Tape" : ""}</span>`}</div>
         ${b('class="done" data-deco="done"', "Done")}
       </div>`;
+    if (keep) {
+      const sc = bar.querySelector(".decoscroll"); if (sc) sc.scrollLeft = keep.p;
+      const tb = bar.querySelector(".decotabs"); if (tb) tb.scrollLeft = keep.t;
+    }
   }
   async function decoAction(a, t) {
     const it = col.items.find(i => i.id === selectedId);
@@ -844,7 +856,7 @@ export async function mount(root, state) {
     root.innerHTML = `
       <div class="wrap">
         <header class="top">
-          <a class="wordmark" href="#/">diary</a>
+          <a class="wordmark" href="#/">Diary</a>
           <a class="navtag" href="#/">Today</a>
         </header>
         <h1 class="page-title day-title">Archive</h1>
