@@ -5,8 +5,18 @@ const INK = "#2C2B27", PENCIL = "#67695F", CARD = "#D5D7CE", PAPER = "#F7F5EF", 
 
 const loadImg = src => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; });
 async function blobImg(blob) {
-  const u = URL.createObjectURL(blob);
-  try { const i = await loadImg(u); await i.decode?.().catch(() => {}); return i; } finally { setTimeout(() => URL.revokeObjectURL(u), 4000); }
+  let src = null;
+  try { src = await createImageBitmap(blob); } catch {}
+  if (!src) {
+    const u = URL.createObjectURL(blob);
+    try { src = await loadImg(u); await src.decode?.().catch(() => {}); } finally { setTimeout(() => URL.revokeObjectURL(u), 4000); }
+  }
+  // copy onto a plain canvas: Safari draws canvases reliably
+  const w = src.width || src.naturalWidth, h = src.height || src.naturalHeight;
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  c.getContext("2d").drawImage(src, 0, 0);
+  c.naturalWidth = w; c.naturalHeight = h;
+  return c;
 }
 
 function grainPattern(ctx, scale) {
@@ -109,9 +119,57 @@ export async function renderDay(opt) {
     return g;
   }).filter(Boolean);
   if (!geo.length) return cv;
-  const L = Math.min(...geo.map(g => g.l)), R = Math.max(...geo.map(g => g.r)), T = Math.min(...geo.map(g => g.t)), B = Math.max(...geo.map(g => g.b));
-  const s = Math.min((W - 2 * M) / (R - L), (bottom - contentTop) / (B - T), 2.6 * u);
-  const ox = (W - (R - L) * s) / 2 - L * s, oy = contentTop - T * s;
+
+  // stickers, text and tape go with the photo they sit on (or the nearest one)
+  const photosG = geo.filter(g => g.it.kind === "photo");
+  const groups = photosG.map(p => ({ members: [p] }));
+  const loose = [];
+  for (const g of geo) {
+    if (g.it.kind === "photo") continue;
+    const cx = (g.l + g.r) / 2, cy = (g.t + g.b) / 2;
+    let best = -1, bd = Infinity;
+    photosG.forEach((p, i) => {
+      const inside = cx >= p.l && cx <= p.r && cy >= p.t && cy <= p.b;
+      const d = inside ? -1 : Math.hypot(cx - (p.l + p.r) / 2, cy - (p.t + p.b) / 2);
+      if (d < bd) { bd = d; best = i; }
+    });
+    if (best >= 0) groups[best].members.push(g); else loose.push(g);
+  }
+  if (!groups.length) groups.push({ members: loose.splice(0) });
+  else if (loose.length) groups[0].members.push(...loose);
+  for (const gr of groups) {
+    gr.l = Math.min(...gr.members.map(m => m.l)); gr.r = Math.max(...gr.members.map(m => m.r));
+    gr.t = Math.min(...gr.members.map(m => m.t)); gr.b = Math.max(...gr.members.map(m => m.b));
+    gr.w = gr.r - gr.l; gr.h = gr.b - gr.t;
+  }
+  groups.sort((a, b) => Math.abs(a.t - b.t) > 40 ? a.t - b.t : a.l - b.l); // page order
+
+  // try 1–4 columns; keep the one where pictures come out biggest while everything fits the screen
+  const AW = W - 2 * M, AH = bottom - contentTop, gap = 16 * u, MAX = 3.2 * u;
+  let plan = null;
+  for (let c = 1; c <= Math.min(4, groups.length); c++) {
+    const cellW = (AW - gap * (c - 1)) / c, rows = [];
+    for (let i = 0; i < groups.length; i += c) rows.push(groups.slice(i, i + c));
+    const rowH = rows.map(r => Math.max(...r.map(g => g.h * Math.min(cellW / g.w, MAX))));
+    const total = rowH.reduce((a, b) => a + b, 0) + gap * (rows.length - 1);
+    const f = Math.min(1, (AH - gap * (rows.length - 1)) / (total - gap * (rows.length - 1)));
+    const area = groups.reduce((a, g) => a + g.w * g.h * (Math.min(cellW / g.w, MAX) * f) ** 2, 0);
+    if (!plan || area > plan.area) plan = { c, cellW, rows, rowH, f, area };
+  }
+  const { c, cellW, rows, rowH, f } = plan;
+  const usedH = rowH.reduce((a, b) => a + b * f, 0) + gap * (rows.length - 1);
+  let yy = contentTop + Math.max(0, (AH - usedH) / 2);
+  rows.forEach((r, ri) => {
+    let xx = M + (AW - (c * cellW * f + gap * (c - 1))) / 2 + (c - r.length) * (cellW * f + gap) / 2;
+    r.forEach(g => {
+      g.s = Math.min(cellW / g.w, MAX) * f;
+      g.ox = xx + (cellW * f - g.w * g.s) / 2 - g.l * g.s;
+      g.oy = yy + (rowH[ri] * f - g.h * g.s) / 2 - g.t * g.s;
+      g.members.forEach(m => { m.s = g.s; m.ox = g.ox; m.oy = g.oy; });
+      xx += cellW * f + gap;
+    });
+    yy += rowH[ri] * f + gap;
+  });
 
   // pictures first
   const imgs = {};
@@ -121,13 +179,13 @@ export async function renderDay(opt) {
   }));
   const cutImgs = {};
   for (const g of geo) if (g.it.kind === "text" && g.it.font === "cut")
-    for (const c of g.it.text.toLowerCase()) if (c >= "a" && c <= "z" && !cutImgs[c]) cutImgs[c] = await loadImg(`cutout/${c}.webp`).catch(() => null);
+    for (const ch of g.it.text.toLowerCase()) if (ch >= "a" && ch <= "z" && !cutImgs[ch]) cutImgs[ch] = await loadImg(`cutout/${ch}.webp`).catch(() => null);
 
   // ---- draw, back to front ----
   for (const g of geo.sort((a, b) => a.z - b.z)) {
-    const { it, el } = g, w = g.w * s, h = g.h * s;
+    const { it, el } = g, s = g.s, w = g.w * s, h = g.h * s;
     ctx.save();
-    ctx.translate(ox + (g.x + g.w / 2) * s, oy + (g.y + g.h / 2) * s);
+    ctx.translate(g.ox + (g.x + g.w / 2) * s, g.oy + (g.y + g.h / 2) * s);
     ctx.rotate(g.rot * Math.PI / 180);
     ctx.translate(-w / 2, -h / 2);
     if (it.kind === "photo") drawPhoto(ctx, g, el, imgs[it.id], photos[it.ref], s, opt);
