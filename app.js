@@ -1,4 +1,4 @@
-export const VERSION = "14"; // bump on every change; shown at the bottom of Archive
+export const VERSION = "15"; // bump on every change; shown at the bottom of Archive
 // diary — app code. Loaded (and hot-swapped) by index.html.
 // mount(root, state) draws the app and returns an unmount function.
 
@@ -199,6 +199,15 @@ function applyHand() {
   document.fonts?.load(`20px "${ko.family}"`, "가"); // fetch the whole Korean font now, not mid-typing
   document.fonts?.load(`20px "${en.family}"`, "a");
 }
+const LOOK = "diary.look";
+const lookNow = () => getPref(LOOK, "loose");
+function applyLook() {
+  const l = lookNow();
+  document.documentElement.classList.toggle("look-loose", l === "loose");
+  document.documentElement.classList.toggle("look-neat", l !== "loose");
+}
+// stable "random" numbers so a loose layout looks the same every time
+const rnd = (n, k) => { const x = Math.sin(n * 12.9898 + k * 78.233) * 43758.5453; return x - Math.floor(x); };
 function setBarColor(color) { // Safari top and bottom bars
   let m = document.querySelector('meta[name="theme-color"]');
   if (!m) { m = document.createElement("meta"); m.name = "theme-color"; document.head.append(m); }
@@ -214,6 +223,7 @@ export async function mount(root, state) {
   const on = (el, ev, fn, opts = {}) => el.addEventListener(ev, fn, { ...opts, signal: ctl.signal });
 
   applyHand();
+  applyLook();
   setBarColor(CARD);
   if (navigator.storage?.persist) navigator.storage.persisted().then(p => p || navigator.storage.persist());
 
@@ -372,7 +382,7 @@ export async function mount(root, state) {
         <div class="dayhead">
           <div class="daytitle">
             ${editing ? "" : `<a class="daynav" href="${hrefOf(prevK)}" data-nav="prev" aria-label="Previous day">‹</a>`}
-            <h1 class="page-title day-title">${title}</h1>
+            <h1 class="page-title day-title"><span class="date-scrap">${title}</span></h1>
             ${editing || isToday ? "" : `<a class="daynav" href="${hrefOf(nextK)}" data-nav="next" aria-label="Next day">›</a>`}
           </div>
           ${editing ? `<span class="hint typed">Drag to move. Corner handle turns and resizes.</span>` : `<button class="pencilbtn" data-decorate>Decorate${PENCIL_LOOP}</button>`}
@@ -380,6 +390,7 @@ export async function mount(root, state) {
         <div class="board paper-${paper}${editing ? " editing" : ""}" id="board"></div>
         <div class="slip">
           <span class="tape" aria-hidden="true"></span>
+          <span class="slip-paper" aria-hidden="true"></span>
           <label class="sr" for="note">About the day</label>
           <textarea class="note" id="note" rows="3" placeholder="how was today?">${esc(day.note || "")}</textarea>
         </div>
@@ -408,17 +419,42 @@ export async function mount(root, state) {
   function grid() {
     const bw = boardEl.clientWidth || 360;
     const cols = bw < 560 ? 2 : bw < 900 ? 3 : 4, gap = bw < 560 ? .05 : .035;
-    const w = (1 - gap * (cols - 1) - .02) / cols;
-    const rowH = w * 1.34 + 92 / bw;
-    return { slot: n => ({ x: .01 + (n % cols) * (w + gap), y: .035 + Math.floor(n / cols) * rowH, w }), cols };
+    const capH = 92 / bw;
+    if (lookNow() !== "loose") {
+      const w = (1 - gap * (cols - 1) - .02) / cols;
+      const rowH = w * 1.34 + capH;
+      return n => ({ x: .01 + (n % cols) * (w + gap), y: .035 + Math.floor(n / cols) * rowH, w, rot: TILTS[n % 4] });
+    }
+    // loose: each row gets mixed sizes, uneven gaps, small drops and turns; rows nest into each other a little
+    const rows = [];
+    const row = r => {
+      while (rows.length <= r) {
+        const i = rows.length, top = i ? rows[i - 1].top + rows[i - 1].h : .03;
+        const scales = Array.from({ length: cols }, (_, c) => .8 + rnd(i * 7 + c, 1) * .42);
+        const gaps = Array.from({ length: cols - 1 }, (_, c) => -.012 + rnd(i * 7 + c, 2) * .06);
+        const total = scales.reduce((a, b) => a + b, 0), room = .97 - gaps.reduce((a, b) => a + b, 0);
+        const ws = scales.map(v => v / total * room);
+        let x = .015 + (rnd(i, 3) - .5) * .02; const xs = [];
+        ws.forEach((w, c) => { xs.push(x); x += w + (gaps[c] || 0); });
+        const drops = ws.map((w, c) => rnd(i * 7 + c, 4) * .07);
+        const h = Math.max(...ws.map((w, c) => w * 1.34 + drops[c])) * .9 + capH;
+        rows.push({ top, h, ws, xs, drops });
+      }
+      return rows[r];
+    };
+    return n => {
+      const R = row(Math.floor(n / cols)), c = n % cols;
+      return { x: R.xs[c], y: R.top + R.drops[c], w: R.ws[c], rot: (rnd(n, 5) - .5) * 6.5 };
+    };
   }
   function layoutAuto() {
-    const g = grid(); let n = 0;
+    const slot = grid(); let n = 0;
     const order = dayPhotos.map(p => p.id);
     col.items.filter(i => i.kind === "photo" && i.auto)
       .sort((a, b) => order.indexOf(a.ref) - order.indexOf(b.ref))
-      .forEach(i => { Object.assign(i, g.slot(n), { rot: TILTS[n % 4] }); n++; });
-    return g.slot(n); // where the add tile goes
+      .forEach(i => { Object.assign(i, slot(n)); n++; });
+    const add = slot(n);
+    return lookNow() === "loose" ? { ...add, w: Math.min(add.w, .42), rot: 0 } : add; // where the add tile goes
   }
 
   const pos = i => `left:calc(var(--bw) * ${i.x});top:calc(var(--bw) * ${i.y});width:calc(var(--bw) * ${i.w});transform:rotate(${i.rot || 0}deg);z-index:${i.z || 1}`;
@@ -450,7 +486,9 @@ export async function mount(root, state) {
     } else return "";
     const handles = editing ? `<span class="h-rot" data-h="t" title="Turn and resize">${ROTATE_ICON}</span>${i.kind !== "photo" ? `<button class="h-del" data-h="d" aria-label="Remove">×</button>` : ""}` : "";
     const extra = (i.kind === "image" && i.outline ? " outline" : "") + (i.kind === "photo" ? ` fr-${i.frame || "print"} lk-${i.look || "none"}` : "");
-    return `<div class="ci ci-${i.kind}${extra}${i.id === selectedId ? " sel" : ""}" data-id="${i.id}" style="${pos(i)}">${inner}${handles}</div>`;
+    const seed = [...i.id].reduce((a, ch) => a + ch.charCodeAt(0), 0);
+    const vars = i.kind === "photo" ? `;--lift:${(.6 + rnd(seed, 6) * .9).toFixed(2)};--tape-x:${(35 + rnd(seed, 7) * 30).toFixed(0)}%;--tape-r:${((rnd(seed, 8) - .5) * 14).toFixed(1)}deg` : "";
+    return `<div class="ci ci-${i.kind}${extra}${i.id === selectedId ? " sel" : ""}" data-id="${i.id}" style="${pos(i)}${vars}">${inner}${handles}</div>`;
   }
 
   function drawBoard() {
@@ -667,7 +705,7 @@ export async function mount(root, state) {
         ${b('data-deco="paste"', "Paste")}
         ${b('data-deco="commons"', "Wikimedia")}
         ${it?.kind === "image" ? b('data-deco="outline"', "Outline", it.outline) : ""}
-        ${it ? b('data-deco="back"', "Send back") : `<span class="group" aria-label="Paper">${[["card", "Card"], ["kraft", "Kraft"], ["grid", "Grid"], ["album", "Album"]].map(([f, n]) => b(`data-paper="${f}" class="paper-btn pb-${f}"`, n, paper === f)).join("")}</span>${b('data-deco="tidy"', "Tidy up")}`}`;
+        ${it ? b('data-deco="back"', "Send back") : `<span class="group" aria-label="Paper">${[["card", "Card"], ["kraft", "Kraft"], ["grid", "Grid"], ["album", "Album"]].map(([f, n]) => b(`data-paper="${f}" class="paper-btn pb-${f}"`, n, paper === f)).join("")}</span>${b('data-deco="tidy"', "Tidy up")}<span class="group" aria-label="Look">${[["neat", "Neat"], ["loose", "Loose"]].map(([f, n]) => b(`data-look="${f}"`, n, lookNow() === f)).join("")}</span>`}`;
     }
     bar.innerHTML = `<div class="decoscroll">${html}</div>${b('class="done" data-deco="done"', "Done")}`;
   }
@@ -833,6 +871,10 @@ export async function mount(root, state) {
               <span class="sample" style="font-family:'${f.family}'">Today’s page</span><span class="name">${f.name}</span>
             </button>`).join("")}</div>
         </details>
+        <div class="lookpick">
+          <span class="typed">Page look</span>
+          ${[["neat", "Neat grid"], ["loose", "Loose"]].map(([f, n]) => `<button class="chip" data-look="${f}" aria-pressed="${lookNow() === f}">${n}</button>`).join("")}
+        </div>
         <div class="keep">
           <p>${status}</p>
           <div class="row">${actions}</div>
@@ -981,7 +1023,7 @@ export async function mount(root, state) {
 
   // ---------- events (all removed on unmount) ----------
   on(document, "click", async e => {
-    const t = e.target.closest("[data-camera],[data-library],[data-open],[data-close],[data-step],[data-delete],[data-export],[data-import],[data-folder],[data-resume],[data-stopfolder],[data-importfolder],[data-font],[data-decorate],[data-deco],[data-tx],[data-sheet-close],[data-pick],[data-ph],[data-paper],[data-nav]");
+    const t = e.target.closest("[data-camera],[data-library],[data-open],[data-close],[data-step],[data-delete],[data-export],[data-import],[data-folder],[data-resume],[data-stopfolder],[data-importfolder],[data-font],[data-decorate],[data-deco],[data-tx],[data-sheet-close],[data-pick],[data-ph],[data-paper],[data-nav],[data-look]");
     if (!t) {
       if (viewerEl && e.target.classList?.contains("stage")) closeViewer();
       if (sheetEl && e.target === sheetEl) closeCommons();
@@ -1000,6 +1042,12 @@ export async function mount(root, state) {
     else if (t.dataset.tx) textAction(t);
     else if (t.dataset.ph) photoAction(t);
     else if (t.dataset.paper) setPaper(t.dataset.paper);
+    else if (t.dataset.look) {
+      try { localStorage.setItem(LOOK, t.dataset.look); } catch {}
+      applyLook();
+      if (boardEl) { drawBoard(); renderDecoBar(); }
+      root.querySelectorAll("[data-look].chip").forEach(c => c.setAttribute("aria-pressed", String(c === t)));
+    }
     else if (t.dataset.nav) state.navDir = t.dataset.nav === "prev" ? "right" : "left"; // link does the rest
     else if (has("data-sheet-close")) closeCommons();
     else if (t.dataset.pick) pickCommons(t);
