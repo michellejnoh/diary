@@ -1,4 +1,4 @@
-export const VERSION = "9"; // bump on every change; shown at the bottom of Archive
+export const VERSION = "10"; // bump on every change; shown at the bottom of Archive
 // diary — app code. Loaded (and hot-swapped) by index.html.
 // mount(root, state) draws the app and returns an unmount function.
 
@@ -22,12 +22,13 @@ const touch = () => matchMedia("(pointer: coarse)").matches;
 // v3: + photos.caption, meta store (backup folder handle)
 function openDB() {
   return new Promise((res, rej) => {
-    const r = indexedDB.open("diary", 3);
+    const r = indexedDB.open("diary", 4);
     r.onupgradeneeded = (e) => {
       const db = r.result, t = r.transaction;
       if (!db.objectStoreNames.contains("days")) db.createObjectStore("days", { keyPath: "date" });
       if (!db.objectStoreNames.contains("photos")) db.createObjectStore("photos", { keyPath: "id" }).createIndex("date", "date");
       if (!db.objectStoreNames.contains("meta")) db.createObjectStore("meta");
+      if (!db.objectStoreNames.contains("assets")) db.createObjectStore("assets", { keyPath: "id" }); // photo stickers
       if (e.oldVersion === 1) {
         const days = t.objectStore("days"), photos = t.objectStore("photos");
         days.openCursor().onsuccess = ev => {
@@ -82,10 +83,18 @@ function makeStore(db) {
       };
       t.oncomplete = () => res(out); t.onerror = () => rej(t.error);
     }),
+    getAssets: ids => new Promise((res, rej) => {
+      const t = db.transaction("assets", "readonly"), s = t.objectStore("assets"), out = {};
+      for (const id of ids) s.get(id).onsuccess = e => { if (e.target.result) out[id] = e.target.result; };
+      t.oncomplete = () => res(out); t.onerror = () => rej(t.error);
+    }),
+    putAsset: a => run("assets", "readwrite", t => t.objectStore("assets").put(a)),
+    delAsset: id => run("assets", "readwrite", t => t.objectStore("assets").delete(id)),
     dump: () => new Promise((res, rej) => {
-      const t = db.transaction(["days", "photos"], "readonly"); const box = {};
+      const t = db.transaction(["days", "photos", "assets"], "readonly"); const box = {};
       t.objectStore("days").getAll().onsuccess = e => box.days = e.target.result;
       t.objectStore("photos").getAll().onsuccess = e => box.photos = e.target.result;
+      t.objectStore("assets").getAll().onsuccess = e => box.assets = e.target.result;
       t.oncomplete = () => res(box); t.onerror = () => rej(t.error);
     }),
     count: () => run("photos", "readonly", t => t.objectStore("photos").count()),
@@ -149,15 +158,6 @@ const CAMERA = `<svg class="cam" viewBox="0 0 48 36" aria-hidden="true" fill="no
   <path d="M24.2 18.1c1.7-.1 2.9 1.1 2.9 2.7 0 1.6-1.3 2.8-3 2.8-1.6 0-2.8-1.3-2.7-2.9.1-1.4 1.2-2.5 2.8-2.6z"/>
   <path d="M36.8 15.4l3.5-.2"/><path d="M8.9 11l.3-2.4 3.5-.1.2 2.2"/>
 </g></svg>`;
-const STICKERS = {
-  star: { color: "#C08A26", path: "M30.5 6.5l6.2 15.2 16.6 1.6-12.8 10.6 4.4 16.4-14.6-9-14.3 9.3 3.9-16.6L7.4 23.5l16.8-1.4z" },
-  heart: { color: "#B9452E", path: "M30 50.5C14.5 40 7.2 31 8.6 22c1.3-8.3 10.8-11.4 16.6-6.3 2.3 2 3.9 4.5 4.9 7.3 1.5-3.6 3.6-6.8 7.1-8.5 6.6-3.2 13.9 1 14.2 8.8.4 9.4-7.9 17.6-21.4 27.2z" },
-  arrow: { color: "#2C2B27", path: "M8.5 41.5c9.5-11.8 24.6-19.6 41.4-20.4M50 21l-8.6-6.1M50 21l-6.2 8.6" },
-  circle: { color: "#2C2B27", path: "M30 9.2c13.2-.9 22.6 8.1 21.9 20.4-.8 12.8-11.8 21.6-24.1 20.8C15 49.7 7.6 40.4 8.3 28.6 9.1 17.4 18.2 9.9 33.4 10.6c5.1.3 9.2 2 12.3 4.6" },
-  sparkle: { color: "#C08A26", path: "M30 8.5c1.6 11.7 5.1 15.8 17.8 21.5-12.8 4.3-16.3 8.1-17.8 21.5-1.8-13.6-5.2-17.4-18-21.5 12.9-5.8 16.5-9.8 18-21.5z" },
-  squiggle: { color: "#2C2B27", path: "M5 32.5c5.8-6.2 10.1 6.1 15.9-.1s10.3 6.2 16.1 0 10.2 6.1 16-.1" },
-};
-const stickerSVG = k => `<svg viewBox="0 0 60 60" fill="none" stroke="${STICKERS[k].color}" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${STICKERS[k].path}" filter="url(#rough)"/></svg>`;
 const ROTATE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18.5 9.5a7 7 0 1 0 .8 5.6"/><path d="M19 4.5v5h-5"/></svg>`;
 
 // ---------- backup bookkeeping ----------
@@ -169,6 +169,7 @@ const ls = {
 };
 const LAST_BACKUP = "diary.lastBackup", LAST_CHANGE = "diary.lastChange";
 const photoFile = p => `${p.date}_${p.id}.jpg`;
+const assetFile = a => `${a.id}.${a.blob.type === "image/png" ? "png" : "jpg"}`;
 const canFolder = "showDirectoryPicker" in window;
 
 // ---------- handwriting fonts (Korean + English picked separately) ----------
@@ -230,7 +231,7 @@ export async function mount(root, state) {
     if (syncing) { syncAgain = true; return; }
     syncing = true;
     try {
-      const { days, photos } = await store.dump();
+      const { days, photos, assets } = await store.dump();
       const pdir = await dir.getDirectoryHandle("photos", { create: true });
       const have = new Set();
       for await (const name of pdir.keys()) have.add(name);
@@ -243,10 +244,19 @@ export async function mount(root, state) {
         }
       }
       for (const name of have) if (/^\d{4}-\d{2}-\d{2}_[a-z0-9-]+\.jpg$/.test(name) && !want.has(name)) await pdir.removeEntry(name);
+      const sdir = await dir.getDirectoryHandle("stickers", { create: true });
+      const haveS = new Set(); for await (const name of sdir.keys()) haveS.add(name);
+      const wantS = new Set();
+      for (const a of assets) {
+        const name = assetFile(a); wantS.add(name);
+        if (!haveS.has(name)) { const w = await (await sdir.getFileHandle(name, { create: true })).createWritable(); await w.write(a.blob); await w.close(); }
+      }
+      for (const name of haveS) if (!wantS.has(name)) await sdir.removeEntry(name);
       const index = {
-        app: "diary", version: 3, saved: new Date().toISOString(),
+        app: "diary", version: 4, saved: new Date().toISOString(),
         days: days.map(d => ({ date: d.date, note: d.note, view: d.view, collage: d.collage, updated: d.updated })),
         photos: photos.map(p => ({ id: p.id, date: p.date, added: p.added, caption: p.caption || "", file: `photos/${photoFile(p)}` })),
+        stickers: assets.map(a => ({ id: a.id, source: a.source || null, file: `stickers/${assetFile(a)}` })),
       };
       const w = await (await dir.getFileHandle("diary.json", { create: true })).createWritable();
       await w.write(JSON.stringify(index, null, 1)); await w.close();
@@ -306,6 +316,7 @@ export async function mount(root, state) {
   cameraInput.setAttribute("capture", "environment");
   const libraryInput = mkInput({ accept: "image/*", multiple: true });
   const importInput = mkInput({ accept: "application/json,.json" });
+  const stickerInput = mkInput({ accept: "image/*", multiple: true });
 
   // ---------- routing ----------
   const route = () => {
@@ -327,6 +338,7 @@ export async function mount(root, state) {
     if (state.viewer && r.page === "day") openViewer(state.viewer, false);
   }
 
+  // ---------- day page: one board. Grid by default; Decorate to move things freely ----------
   function backupLine() {
     if (dir && !dirOK) return `<p class="nudge">Backup paused. <button class="link" data-resume>Resume</button></p>`;
     if (dir) return "";
@@ -336,128 +348,142 @@ export async function mount(root, state) {
       : `<p class="nudge">Not backed up. <button class="link" data-export>Save backup</button></p>`;
   }
 
-  // ---------- day page ----------
   async function renderDay(k) {
     const d = fromKey(k), isToday = k === todayKey();
     const [photos, day] = await Promise.all([store.photosOn(k), store.getDay(k)]);
-    const note = day.note || "";
     dayPhotos = photos;
-    const view = day.view || "grid";
+    const editing = !!state.decorating;
     const title = isToday
       ? `<span class="soft">Today,</span> ${d.getDate()} ${MONTHS[d.getMonth()]}`
       : `<span class="soft">${WEEKDAYS[d.getDay()]},</span> ${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 
-    const prints = photos.map((p, i) => `
-      <figure class="print" style="--i:${i}">
-        <span class="tape" aria-hidden="true"></span>
-        <button class="frame" data-open="${p.id}" aria-label="Open photo ${i + 1}">
-          <span class="photo"><img src="${url(p.blob)}" alt="" class="${developIds.has(p.id) ? "developing" : ""}"><span class="stamp">${stampSVG(k)}</span></span>
-        </button>
-        <figcaption>
-          ${keyOf(new Date(p.added)) === k ? `<span class="time">${timeOf(p.added)}</span>` : ""}
-          <label class="sr" for="cap-${p.id}">Note for photo ${i + 1}</label>
-          <textarea class="caption" id="cap-${p.id}" data-cap="${p.id}" rows="1" placeholder="write about this one">${esc(p.caption)}</textarea>
-        </figcaption>
-      </figure>`).join("");
-    developIds = new Set();
-
-    const add = `
-      <div class="add">
-        <button class="add-tile" data-camera>${CAMERA}<span>${touch() ? "Take a photo" : "Add photos"}</span></button>
-        ${touch() ? `<button class="link small" data-library>or choose from library</button>` : ""}
-      </div>`;
-
     root.innerHTML = `
-      <div class="wrap">
+      <div class="wrap${editing ? " decorating" : ""}">
         <header class="top">
           <a class="wordmark press" href="#/">diary</a>
           <a class="link" href="#/archive">${isToday ? "Archive" : "Back to archive"}</a>
         </header>
-        <h1 class="page-title day-title">${title}</h1>
-        <div class="viewbar">
-          ${state.decorating ? "" : `
-          <button class="link ${view === "grid" ? "on" : ""}" data-view="grid" aria-pressed="${view === "grid"}">Grid</button>
-          <button class="link ${view === "collage" ? "on" : ""}" data-view="collage" aria-pressed="${view === "collage"}">Collage</button>
-          ${view === "collage" ? `<span class="spacer"></span><button class="link" data-decorate>Decorate</button><button class="link" data-camera>${touch() ? "Take a photo" : "Add photos"}</button>` : ""}`}
+        <div class="dayhead">
+          <h1 class="page-title day-title">${title}</h1>
+          ${editing ? `<span class="hint typed">Drag to move. Corner handle turns and resizes.</span>` : (photos.length ? `<button class="link" data-decorate>Decorate</button>` : "")}
         </div>
-        ${view === "collage" ? `<div class="board ${state.decorating ? "editing" : ""}" id="board"></div>` : `<div class="roll">${prints}${add}</div>`}
+        <div class="board${editing ? " editing" : ""}" id="board"></div>
         <div class="slip">
           <span class="tape" aria-hidden="true"></span>
           <label class="sr" for="note">About the day</label>
-          <textarea class="note" id="note" rows="3" placeholder="how was today?">${esc(note)}</textarea>
+          <textarea class="note" id="note" rows="3" placeholder="how was today?">${esc(day.note || "")}</textarea>
         </div>
-        ${state.decorating ? "" : backupLine()}
+        ${editing ? "" : backupLine()}
       </div>
-      ${state.decorating && view === "collage" ? decoBar() : ""}`;
-    root.querySelector(".wrap").classList.toggle("decorating", !!state.decorating && view === "collage");
+      ${editing ? `<div class="decobar" role="toolbar" aria-label="Decorate"></div>` : ""}`;
 
-    if (view === "collage") await mountBoard(k, day, photos);
-    else { state.decorating = false; teardownBoard(); }
+    await mountBoard(k, day, photos);
     root.querySelectorAll("textarea").forEach(grow);
     window.scrollTo(0, state.scroll?.[location.hash] || 0);
   }
   const grow = ta => { ta.style.height = "auto"; ta.style.height = ta.scrollHeight + "px"; };
 
-  // ---------- collage ----------
-  let col = null, colKey = null, boardEl = null, ro = null, selectedId = null, drag = null, colTimer = null;
+  // ---------- board ----------
+  let col = null, colKey = null, boardEl = null, ro = null, lastW = 0, selectedId = null, drag = null, colTimer = null;
+  let assets = {}; // id -> asset
   const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
   const topZ = () => Math.max(0, ...col.items.map(i => i.z || 0));
-  const byPhoto = () => Object.fromEntries(dayPhotos.map(p => [p.id, p]));
+  const botZ = () => Math.min(1, ...col.items.map(i => i.z || 1));
+  const photoMap = () => Object.fromEntries(dayPhotos.map(p => [p.id, p]));
+  const TILTS = [-1.1, .8, -.3, 1.3];
+  const COLORS = ["#2C2B27", "#B9452E", "#2F4F8A", "#3F6B45", "#D9772B", "#F7F5EF"];
+  const HILITES = ["#F4D84E", "#F2A0B4", "#9ED48F", "#97C3EC", "#2A2925"];
 
-  function placePhotos(items, photos) {
-    const have = new Set(items.filter(i => i.kind === "photo").map(i => i.ref));
-    const ids = new Set(photos.map(p => p.id));
-    let added = false;
-    items = items.filter(i => i.kind !== "photo" || ids.has(i.ref));
-    let n = items.filter(i => i.kind === "photo").length;
-    const small = root.clientWidth < 640, cols = small ? 2 : 3, w = small ? .44 : .27;
-    for (const p of photos) if (!have.has(p.id)) {
-      const c = n % cols, r = Math.floor(n / cols), j = ((n * 37) % 11 - 5) / 100;
-      items.push({ id: newId(), kind: "photo", ref: p.id, x: .03 + c * (.94 / cols) + j * .4, y: .05 + r * w * 1.42 + Math.abs(j) * .5,
-        w, rot: ((n * 53) % 9 - 4) * 1.1, z: n + 1 });
-      n++; added = true;
-    }
-    return { items, added };
+  // grid slots, in board-width units
+  function grid() {
+    const bw = boardEl.clientWidth || 360;
+    const cols = bw < 560 ? 2 : bw < 900 ? 3 : 4, gap = bw < 560 ? .05 : .035;
+    const w = (1 - gap * (cols - 1) - .02) / cols;
+    const rowH = w * 1.34 + 92 / bw;
+    return { slot: n => ({ x: .01 + (n % cols) * (w + gap), y: .035 + Math.floor(n / cols) * rowH, w }), cols };
+  }
+  function layoutAuto() {
+    const g = grid(); let n = 0;
+    const order = dayPhotos.map(p => p.id);
+    col.items.filter(i => i.kind === "photo" && i.auto)
+      .sort((a, b) => order.indexOf(a.ref) - order.indexOf(b.ref))
+      .forEach(i => { Object.assign(i, g.slot(n), { rot: TILTS[n % 4] }); n++; });
+    return g.slot(n); // where the add tile goes
   }
 
-  const pos = i => `left:calc(var(--bw) * ${i.x});top:calc(var(--bw) * ${i.y});width:calc(var(--bw) * ${i.w});transform:rotate(${i.rot}deg);z-index:${i.z || 1}`;
-  function itemHTML(i, photos) {
+  const pos = i => `left:calc(var(--bw) * ${i.x});top:calc(var(--bw) * ${i.y});width:calc(var(--bw) * ${i.w});transform:rotate(${i.rot || 0}deg);z-index:${i.z || 1}`;
+  function textStyle(i) {
+    const st = [`color:${i.color || COLORS[0]}`];
+    if (i.bold) st.push("font-weight:700");
+    if (i.hl) st.push(`--hl:${i.hl}`);
+    return st.join(";");
+  }
+  function itemHTML(i) {
+    const editing = !!state.decorating;
     let inner = "";
     if (i.kind === "photo") {
-      const p = photos[i.ref];
-      inner = `<span class="tape" aria-hidden="true"></span>
-        <div class="frame"${state.decorating ? "" : ` data-open="${p.id}" role="button" tabindex="0" aria-label="Open photo"`}>
-          <span class="photo"><img src="${url(p.blob)}" alt="" draggable="false" class="${developIds.has(p.id) ? "developing" : ""}"><span class="stamp">${stampSVG(p.date)}</span></span>
-        </div>${p.caption ? `<p class="ccap">${esc(p.caption)}</p>` : ""}`;
+      const p = photoMap()[i.ref]; if (!p) return "";
+      const time = keyOf(new Date(p.added)) === p.date ? `<span class="time">${timeOf(p.added)}</span>` : "";
+      const img = `<span class="photo"><img src="${url(p.blob)}" alt="" draggable="false" class="${developIds.has(p.id) ? "developing" : ""}"><span class="stamp">${stampSVG(p.date)}</span></span>`;
+      inner = `<span class="tape" aria-hidden="true"></span>` + (editing
+        ? `<div class="frame">${img}</div>${p.caption ? `<p class="ccap">${esc(p.caption)}</p>` : ""}`
+        : `<button class="frame" data-open="${p.id}" aria-label="Open photo">${img}</button>
+           <div class="cap">${time}<label class="sr" for="cap-${p.id}">Note for this photo</label><textarea class="caption" id="cap-${p.id}" data-cap="${p.id}" rows="1" placeholder="write about this one">${esc(p.caption)}</textarea></div>`);
     } else if (i.kind === "text") {
-      inner = `<div class="ctext" style="font-size:calc(var(--bw) * ${i.fs})" spellcheck="false">${esc(i.text)}</div>`;
+      const cls = ["ctext", `f-${i.font || "hand"}`, i.hl ? "hl" : "", i.tape ? "taped" : ""].join(" ");
+      inner = `<div class="ctextbox" style="font-size:calc(var(--bw) * ${i.fs})"><span class="${cls}" style="${textStyle(i)}" spellcheck="false">${esc(i.text)}</span></div>`;
     } else if (i.kind === "tape") {
       inner = `<span class="ctape"></span>`;
-    } else if (i.kind === "sticker") {
-      inner = `<span class="csticker">${stickerSVG(i.shape)}</span>`;
-    }
-    const handles = state.decorating ? `<span class="h-rot" data-h="t" title="Turn and resize">${ROTATE_ICON}</span>${i.kind !== "photo" ? `<button class="h-del" data-h="d" aria-label="Remove">×</button>` : ""}` : "";
-    return `<div class="ci ci-${i.kind}${i.id === selectedId ? " sel" : ""}" data-id="${i.id}" style="${pos(i)}">${inner}${handles}</div>`;
+    } else if (i.kind === "image") {
+      const a = assets[i.ref]; if (!a) return "";
+      inner = `<img class="cimg" src="${url(a.blob)}" alt="" draggable="false">`;
+    } else return "";
+    const handles = editing ? `<span class="h-rot" data-h="t" title="Turn and resize">${ROTATE_ICON}</span>${i.kind !== "photo" ? `<button class="h-del" data-h="d" aria-label="Remove">×</button>` : ""}` : "";
+    const extra = i.kind === "image" && i.outline ? " outline" : "";
+    return `<div class="ci ci-${i.kind}${extra}${i.id === selectedId ? " sel" : ""}" data-id="${i.id}" style="${pos(i)}">${inner}${handles}</div>`;
+  }
+
+  function drawBoard() {
+    const addSlot = layoutAuto();
+    const add = state.decorating ? "" : `
+      <div class="ci ci-add" style="${pos({ ...addSlot, rot: 0, z: 0 })}">
+        <button class="add-tile" data-camera>${CAMERA}<span>${touch() ? "Take a photo" : "Add photos"}</span></button>
+        ${touch() ? `<button class="link small" data-library>or choose from library</button>` : ""}
+      </div>`;
+    boardEl.innerHTML = col.items.map(itemHTML).join("") + add;
+    boardEl.querySelectorAll(".caption").forEach(grow);
+    fitBoard();
   }
 
   async function mountBoard(k, day, photos) {
     teardownBoard();
     boardEl = root.querySelector("#board");
     colKey = k;
-    const placed = placePhotos(day.collage?.items ? structuredClone(day.collage.items) : [], photos);
-    col = { items: placed.items };
-    if (placed.added || !day.collage) saveCollage(true);
-    const setBW = () => { boardEl.style.setProperty("--bw", boardEl.clientWidth + "px"); fitBoard(); };
-    const pm = byPhoto();
-    boardEl.innerHTML = col.items.map(i => itemHTML(i, pm)).join("") + (state.decorating ? "" : (photos.length ? "" : `<p class="board-empty">Add a photo to start.</p>`));
-    setBW();
-    ro = new ResizeObserver(setBW); ro.observe(boardEl);
+    let items = day.collage?.items ? structuredClone(day.collage.items) : [];
+    const ids = new Set(photos.map(p => p.id));
+    items = items.filter(i => (i.kind !== "photo" || ids.has(i.ref)) && i.kind !== "sticker");
+    const have = new Set(items.filter(i => i.kind === "photo").map(i => i.ref));
+    let z = Math.max(0, ...items.map(i => i.z || 0));
+    for (const p of photos) if (!have.has(p.id)) items.push({ id: newId(), kind: "photo", ref: p.id, auto: true, z: ++z });
+    col = { items };
+    assets = await store.getAssets(items.filter(i => i.kind === "image").map(i => i.ref));
+    boardEl.style.setProperty("--bw", boardEl.clientWidth + "px");
+    lastW = boardEl.clientWidth;
+    drawBoard();
     developIds = new Set();
+    ro = new ResizeObserver(() => {
+      if (!boardEl || boardEl.clientWidth === lastW) return;
+      lastW = boardEl.clientWidth;
+      boardEl.style.setProperty("--bw", lastW + "px");
+      if (!drag && !boardEl.contains(document.activeElement)) drawBoard(); else fitBoard();
+    });
+    ro.observe(boardEl);
     if (state.decorating) {
       boardEl.addEventListener("pointerdown", onDown);
       boardEl.addEventListener("pointermove", onMove);
       boardEl.addEventListener("pointerup", onUp);
       boardEl.addEventListener("pointercancel", onUp);
+      renderDecoBar();
     }
   }
   function teardownBoard() { if (ro) { ro.disconnect(); ro = null; } boardEl = null; }
@@ -466,63 +492,113 @@ export async function mount(root, state) {
     if (!boardEl) return;
     let max = 0;
     boardEl.querySelectorAll(".ci").forEach(el => { max = Math.max(max, el.offsetTop + el.offsetHeight); });
-    boardEl.style.height = Math.max(max + 48, boardEl.clientWidth * (state.decorating ? 1.1 : .5)) + "px";
+    boardEl.style.height = Math.max(max + 36, state.decorating ? boardEl.clientWidth * .9 : 120) + "px";
   }
   function saveCollage(now = false) {
     clearTimeout(colTimer);
     const k = colKey, items = structuredClone(col.items);
     const go = async () => { await store.patchDay(k, { collage: { items } }); changed(); };
-    if (now) go(); else colTimer = setTimeout(go, 400);
+    if (now) return go(); colTimer = setTimeout(go, 400);
   }
   function applyPos(el, i) {
     el.style.left = `calc(var(--bw) * ${i.x})`; el.style.top = `calc(var(--bw) * ${i.y})`;
     el.style.width = `calc(var(--bw) * ${i.w})`; el.style.transform = `rotate(${i.rot}deg)`; el.style.zIndex = i.z;
-    const t = el.querySelector(".ctext"); if (t && i.fs) t.style.fontSize = `calc(var(--bw) * ${i.fs})`;
+    const t = el.querySelector(".ctextbox"); if (t && i.fs) t.style.fontSize = `calc(var(--bw) * ${i.fs})`;
+  }
+  const itemEl = id => boardEl?.querySelector(`.ci[data-id="${id}"]`);
+  function redrawItem(it) {
+    const el = itemEl(it.id); if (!el) return;
+    el.outerHTML = itemHTML(it);
+    fitBoard();
   }
   function select(id) {
     selectedId = id;
     boardEl?.querySelectorAll(".ci").forEach(el => el.classList.toggle("sel", el.dataset.id === id));
+    renderDecoBar();
   }
-  function removeItem(id) {
+  async function removeItem(id) {
+    const it = col.items.find(i => i.id === id);
     col.items = col.items.filter(i => i.id !== id);
-    boardEl.querySelector(`.ci[data-id="${id}"]`)?.remove();
+    itemEl(id)?.remove();
+    if (it?.kind === "image") await store.delAsset(it.ref);
     select(null); fitBoard(); saveCollage();
   }
-  function addItem(kind, extra = {}) {
+  const step5 = () => col.items.filter(i => i.kind !== "photo").length % 5; // new items step aside so they don't stack
+  function dropY() {
     const bw = boardEl.clientWidth, top = boardEl.getBoundingClientRect().top;
-    const cy = clamp((innerHeight * .4 - top) / bw, .04, boardEl.clientHeight / bw);
-    const base = { id: newId(), kind, rot: (Math.random() * 10 - 5), z: topZ() + 1 };
-    const it = kind === "text" ? { ...base, x: .2, y: cy, w: .5, fs: .06, text: "" }
-      : kind === "tape" ? { ...base, x: .3, y: cy, w: .3 }
-      : { ...base, x: .38, y: cy, w: .2, ...extra };
-    col.items.push(it);
-    boardEl.insertAdjacentHTML("beforeend", itemHTML(it, byPhoto()));
-    select(it.id); fitBoard(); saveCollage();
-    if (kind === "text") startTextEdit(boardEl.querySelector(`.ci[data-id="${it.id}"]`), it);
+    return clamp((innerHeight * .35 - top) / bw, .03, Math.max(.03, boardEl.clientHeight / bw - .2)) + step5() * .045;
   }
+  function addItem(kind) {
+    const base = { id: newId(), kind, rot: Math.round(Math.random() * 8 - 4), z: topZ() + 1, y: dropY() };
+    const it = kind === "text"
+      ? { ...base, x: .14 + step5() * .05, w: .55, fs: .06, text: "", font: "hand", color: COLORS[0], bold: false, hl: null, tape: false }
+      : { ...base, x: .3 + step5() * .05, w: .3 };
+    col.items.push(it);
+    boardEl.insertAdjacentHTML("beforeend", itemHTML(it));
+    select(it.id); fitBoard(); saveCollage();
+    if (kind === "text") startTextEdit(itemEl(it.id), it);
+  }
+
+  // photo stickers: from the library, the clipboard, or Wikimedia Commons
+  async function addImageBlob(blob, source = null) {
+    if (!state.decorating) { state.decorating = true; selectedId = null; await render(); }
+    const src = URL.createObjectURL(blob);
+    try {
+      const img = await loadImage(src);
+      const keepAlpha = /png|webp|gif/.test(blob.type) || !blob.type;
+      const s = Math.min(1, 1100 / Math.max(img.naturalWidth, img.naturalHeight));
+      const c = document.createElement("canvas");
+      c.width = Math.round(img.naturalWidth * s); c.height = Math.round(img.naturalHeight * s);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      const out = await new Promise(r => c.toBlob(r, keepAlpha ? "image/png" : "image/jpeg", .88));
+      const id = newId();
+      const a = { id, blob: out, source, added: Date.now() };
+      await store.putAsset(a); assets[id] = a;
+      const ratio = c.height / c.width;
+      const it = { id: newId(), kind: "image", ref: id, x: .28 + step5() * .05, y: dropY(), w: clamp(.32 / Math.max(1, ratio), .16, .4), rot: Math.round(Math.random() * 8 - 4), z: topZ() + 1, outline: keepAlpha };
+      col.items.push(it);
+      boardEl.insertAdjacentHTML("beforeend", itemHTML(it));
+      select(it.id); fitBoard(); saveCollage();
+    } catch { alert("That image couldn’t be added. Try another one."); }
+    finally { URL.revokeObjectURL(src); }
+  }
+  async function pasteFromClipboard() {
+    try {
+      const items = await navigator.clipboard.read();
+      for (const ci of items) {
+        const type = ci.types.find(t => t.startsWith("image/"));
+        if (type) { await addImageBlob(await ci.getType(type)); return; }
+      }
+      alert("No image on the clipboard. Copy an image first, then tap Paste.");
+    } catch { alert("No image on the clipboard. Copy an image first, then tap Paste."); }
+  }
+
   function startTextEdit(el, it) {
     const t = el.querySelector(".ctext");
     t.contentEditable = "true"; t.focus();
     const r = document.createRange(); r.selectNodeContents(t); r.collapse(false);
     const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
-    t.oninput = () => { it.text = t.innerText; fitBoard(); saveCollage(); };
-    t.onblur = () => { t.contentEditable = "false"; if (!it.text.trim()) removeItem(it.id); };
+    t.oninput = () => { it.text = t.innerText.replace(/\n$/, ""); fitBoard(); saveCollage(); };
+    t.onblur = () => { t.contentEditable = "false"; if (!it.text.trim() && col.items.includes(it)) removeItem(it.id); };
   }
 
+  // ---------- dragging ----------
   function onDown(e) {
     const el = e.target.closest(".ci");
     if (e.target.closest(".h-del")) { e.preventDefault(); removeItem(el.dataset.id); return; }
-    if (!el) { document.activeElement?.blur?.(); select(null); return; }
+    if (!el || el.classList.contains("ci-add")) { if (document.activeElement?.isContentEditable) document.activeElement.blur(); select(null); return; }
     const t = el.querySelector(".ctext");
-    if (t && t.isContentEditable && e.target.closest(".ctext")) return; // typing in it
+    if (t && t.isContentEditable && e.target.closest(".ctext")) return; // typing
     e.preventDefault();
+    if (document.activeElement?.isContentEditable) document.activeElement.blur();
     const it = col.items.find(i => i.id === el.dataset.id);
+    if (!it) return;
     const wasSel = selectedId === it.id;
-    select(it.id);
+    if (!wasSel) select(it.id);
     it.z = topZ() + 1; el.style.zIndex = it.z;
     if (e.target.closest(".h-rot")) {
       const r = el.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;
-      drag = { mode: "t", it, el, cx, cy, a0: Math.atan2(e.clientY - cy, e.clientX - cx), d0: Math.max(10, Math.hypot(e.clientX - cx, e.clientY - cy)), rot0: it.rot, w0: it.w, fs0: it.fs };
+      drag = { mode: "t", it, el, cx, cy, a0: Math.atan2(e.clientY - cy, e.clientX - cx), d0: Math.max(10, Math.hypot(e.clientX - cx, e.clientY - cy)), rot0: it.rot || 0, w0: it.w, fs0: it.fs };
     } else {
       drag = { mode: "m", it, el, sx: e.clientX, sy: e.clientY, x0: it.x, y0: it.y, bw: boardEl.clientWidth, moved: false, wasSel };
     }
@@ -534,6 +610,7 @@ export async function mount(root, state) {
     if (drag.mode === "m") {
       const dx = (e.clientX - drag.sx) / drag.bw, dy = (e.clientY - drag.sy) / drag.bw;
       if (Math.abs(dx) + Math.abs(dy) > .008) drag.moved = true;
+      if (!drag.moved) return;
       it.x = clamp(drag.x0 + dx, -.15, .95); it.y = Math.max(-.05, drag.y0 + dy);
     } else {
       const a = Math.atan2(e.clientY - drag.cy, e.clientX - drag.cx), d = Math.hypot(e.clientX - drag.cx, e.clientY - drag.cy);
@@ -541,6 +618,7 @@ export async function mount(root, state) {
       it.w = clamp(drag.w0 * d / drag.d0, .06, 1.1);
       if (drag.fs0) it.fs = drag.fs0 * it.w / drag.w0;
     }
+    if (it.auto) delete it.auto; // the user placed it now
     applyPos(el, it);
   }
   function onUp() {
@@ -550,13 +628,111 @@ export async function mount(root, state) {
     fitBoard(); saveCollage();
   }
 
-  function decoBar() {
-    return `<div class="decobar" role="toolbar" aria-label="Decorate">
-      <button data-deco="text">Text</button>
-      <button data-deco="tape" aria-label="Tape"><span class="tape-swatch"></span></button>
-      ${Object.keys(STICKERS).map(k => `<button data-deco="sticker" data-shape="${k}" aria-label="${k}">${stickerSVG(k)}</button>`).join("")}
-      <button class="done" data-deco="done">Done</button>
-    </div>`;
+  // ---------- decorate toolbar ----------
+  function renderDecoBar() {
+    const bar = root.querySelector(".decobar"); if (!bar) return;
+    const it = col?.items.find(i => i.id === selectedId);
+    const b = (attrs, label, pressed) => `<button ${attrs}${pressed != null ? ` aria-pressed="${!!pressed}"` : ""}>${label}</button>`;
+    let html;
+    if (it?.kind === "text") {
+      html = `
+        <span class="group">${[["hand", "Hand"], ["type", "Type"], ["press", "Press"]].map(([f, n]) => b(`data-tx="font" data-v="${f}" class="f-${f}"`, n, (it.font || "hand") === f)).join("")}</span>
+        <span class="group">${b('data-tx="bold" class="bold"', "B", it.bold)}</span>
+        <span class="group" aria-label="Color">${COLORS.map(c => b(`data-tx="color" data-v="${c}" class="dot" style="--c:${c}" aria-label="Color ${c}"`, "", (it.color || COLORS[0]) === c)).join("")}</span>
+        <span class="group" aria-label="Highlighter">${b('data-tx="hl" data-v="" class="hl-none" aria-label="No highlighter"', "", !it.hl)}${HILITES.map(c => b(`data-tx="hl" data-v="${c}" class="hl-dot" style="--c:${c}" aria-label="Highlighter ${c}"`, "", it.hl === c)).join("")}</span>
+        <span class="group">${b('data-tx="tape" class="tape-btn" aria-label="Tape behind text"', `<span class="tape-swatch"></span>`, it.tape)}</span>
+        ${b('data-deco="back"', "Send back")}`;
+    } else {
+      html = `
+        ${b('data-deco="text"', "Text")}
+        ${b('data-deco="tape" aria-label="Tape"', `<span class="tape-swatch"></span>`)}
+        ${b('data-deco="photo"', "Photo")}
+        ${b('data-deco="paste"', "Paste")}
+        ${b('data-deco="commons"', "Wikimedia")}
+        ${it?.kind === "image" ? b('data-deco="outline"', "Outline", it.outline) : ""}
+        ${it ? b('data-deco="back"', "Send back") : b('data-deco="tidy"', "Tidy up")}`;
+    }
+    bar.innerHTML = `<div class="decoscroll">${html}</div>${b('class="done" data-deco="done"', "Done")}`;
+  }
+  async function decoAction(a, t) {
+    const it = col.items.find(i => i.id === selectedId);
+    if (a === "done") {
+      if (document.activeElement?.isContentEditable) document.activeElement.blur();
+      await saveCollage(true);
+      state.decorating = false; selectedId = null; render();
+    }
+    else if (a === "text" || a === "tape") addItem(a);
+    else if (a === "photo") { stickerInput.value = ""; stickerInput.click(); }
+    else if (a === "paste") pasteFromClipboard();
+    else if (a === "commons") openCommons();
+    else if (a === "tidy") {
+      col.items.forEach(i => { if (i.kind === "photo") i.auto = true; });
+      drawBoard(); saveCollage();
+    }
+    else if (a === "back" && it) {
+      it.z = botZ() - 1; col.items.forEach(i => { i.z = (i.z || 1) - it.z + 1; }); // keep z positive
+      col.items.forEach(i => { const el = itemEl(i.id); if (el) el.style.zIndex = i.z; });
+      saveCollage();
+    }
+    else if (a === "outline" && it) { it.outline = !it.outline; redrawItem(it); select(it.id); saveCollage(); }
+  }
+  function textAction(t) {
+    const it = col.items.find(i => i.id === selectedId); if (!it) return;
+    const k = t.dataset.tx, v = t.dataset.v;
+    if (k === "font") it.font = v;
+    else if (k === "bold") it.bold = !it.bold;
+    else if (k === "color") it.color = v;
+    else if (k === "hl") it.hl = v || null;
+    else if (k === "tape") it.tape = !it.tape;
+    redrawItem(it); select(it.id); saveCollage();
+  }
+
+  // ---------- Wikimedia Commons picker ----------
+  let sheetEl = null;
+  function openCommons() {
+    closeCommons();
+    sheetEl = document.createElement("div");
+    sheetEl.className = "sheet"; sheetEl.setAttribute("role", "dialog"); sheetEl.setAttribute("aria-modal", "true"); sheetEl.setAttribute("aria-label", "Find images on Wikimedia Commons");
+    sheetEl.innerHTML = `
+      <div class="sheet-card">
+        <div class="sheet-head">
+          <form class="sheet-search" data-commons-form>
+            <input type="search" name="q" placeholder="Search images, e.g. cat, flower, ticket" autocomplete="off" enterkeyhint="search">
+            <button type="submit">Search</button>
+          </form>
+          <button class="link" data-sheet-close>Close</button>
+        </div>
+        <p class="sheet-note typed">From Wikimedia Commons, transparent PNGs. Each image has its own license. English words find more.</p>
+        <div class="sheet-results" aria-live="polite"></div>
+      </div>`;
+    document.body.append(sheetEl);
+    sheetEl.querySelector("input").focus();
+  }
+  function closeCommons() { if (sheetEl) { sheetEl.remove(); sheetEl = null; } }
+  async function searchCommons(q) {
+    const box = sheetEl.querySelector(".sheet-results");
+    box.innerHTML = `<p class="sheet-msg typed">Searching…</p>`;
+    const u = new URL("https://commons.wikimedia.org/w/api.php");
+    Object.entries({ action: "query", format: "json", origin: "*", generator: "search", gsrnamespace: "6", gsrsearch: `${q} filemime:png`, gsrlimit: "30", prop: "imageinfo", iiprop: "url|mime", iiurlwidth: "600" })
+      .forEach(([k, v]) => u.searchParams.set(k, v));
+    try {
+      const data = await (await fetch(u)).json();
+      const pages = Object.values(data.query?.pages || {}).sort((a, b) => (a.index || 0) - (b.index || 0));
+      const found = pages.map(p => ({ title: p.title.replace(/^File:/, ""), thumb: p.imageinfo?.[0]?.thumburl, page: p.imageinfo?.[0]?.descriptionurl })).filter(r => r.thumb);
+      if (!found.length) { box.innerHTML = `<p class="sheet-msg typed">Nothing found. Try another word, in English.</p>`; return; }
+      box.innerHTML = found.map(r => `<button class="pick" data-pick="${esc(r.thumb)}" data-page="${esc(r.page)}" data-title="${esc(r.title)}" aria-label="${esc(r.title)}"><img src="${esc(r.thumb)}" alt="" loading="lazy"></button>`).join("");
+    } catch {
+      box.innerHTML = `<p class="sheet-msg typed">Can’t reach Wikimedia right now. Check your connection and search again.</p>`;
+    }
+  }
+  async function pickCommons(t) {
+    t.classList.add("loading");
+    try {
+      const blob = await (await fetch(t.dataset.pick, { mode: "cors" })).blob();
+      const source = { from: "Wikimedia Commons", title: t.dataset.title, url: t.dataset.page };
+      closeCommons();
+      await addImageBlob(blob, source);
+    } catch { t.classList.remove("loading"); alert("That image couldn’t be loaded. Pick another one."); }
   }
 
   // ---------- archive page ----------
@@ -701,8 +877,9 @@ export async function mount(root, state) {
 
   async function exportBackup() {
     await flushText();
-    const { days, photos } = await store.dump();
-    const out = { app: "diary", version: 3, days, photos: [] };
+    const { days, photos, assets } = await store.dump();
+    const out = { app: "diary", version: 4, days, photos: [], stickers: [] };
+    for (const a of assets) out.stickers.push({ id: a.id, source: a.source || null, blob: await blobToData(a.blob) });
     for (const p of photos) out.photos.push({ id: p.id, date: p.date, added: p.added, caption: p.caption || "", blob: await blobToData(p.blob), thumb: await blobToData(p.thumb) });
     const name = `diary-backup-${todayKey()}.json`;
     const file = new File([JSON.stringify(out)], name, { type: "application/json" });
@@ -720,7 +897,8 @@ export async function mount(root, state) {
     render();
   }
 
-  async function restoreRecords(days, photos) {
+  async function restoreRecords(days, photos, stickers = []) {
+    for (const a of stickers) await store.putAsset(a);
     for (const d of days) await store.patchDay(d.date, { note: d.note || "", ...(d.collage ? { collage: d.collage } : {}), ...(d.view ? { view: d.view } : {}) });
     for (const p of photos) await store.putPhoto(p); // same id = same photo, nothing doubles
     changed();
@@ -742,7 +920,9 @@ export async function mount(root, state) {
       days.push(...(data.days || []));
       for (const p of data.photos || []) photos.push({ id: p.id, date: p.date, added: p.added, caption: p.caption || "", blob: await dataToBlob(p.blob), thumb: await dataToBlob(p.thumb) });
     }
-    restoreRecords(days, photos);
+    const stickers = [];
+    for (const a of data.stickers || []) stickers.push({ id: a.id, source: a.source, blob: await dataToBlob(a.blob) });
+    restoreRecords(days, photos, stickers);
   }
 
   async function importFolder() {
@@ -757,7 +937,14 @@ export async function mount(root, state) {
           photos.push({ id: p.id, date: p.date, added: p.added, caption: p.caption || "", blob, thumb: await thumbFromBlob(blob) });
         } catch { /* missing file: skip */ }
       }
-      restoreRecords(index.days || [], photos);
+      const stickers = [];
+      try {
+        const sdir = await src.getDirectoryHandle("stickers");
+        for (const a of index.stickers || []) {
+          try { stickers.push({ id: a.id, source: a.source, blob: await (await sdir.getFileHandle(a.file.replace(/^stickers\//, ""))).getFile() }); } catch {}
+        }
+      } catch {}
+      restoreRecords(index.days || [], photos, stickers);
     } catch (err) {
       if (err.name !== "AbortError") alert("That folder isn’t a diary backup. Choose the folder that has diary.json in it.");
     }
@@ -765,27 +952,25 @@ export async function mount(root, state) {
 
   // ---------- events (all removed on unmount) ----------
   on(document, "click", async e => {
-    const t = e.target.closest("[data-camera],[data-library],[data-open],[data-close],[data-step],[data-delete],[data-export],[data-import],[data-folder],[data-resume],[data-stopfolder],[data-importfolder],[data-font],[data-view],[data-decorate],[data-deco]");
-    if (!t) { if (viewerEl && e.target.classList?.contains("stage")) closeViewer(); return; }
+    const t = e.target.closest("[data-camera],[data-library],[data-open],[data-close],[data-step],[data-delete],[data-export],[data-import],[data-folder],[data-resume],[data-stopfolder],[data-importfolder],[data-font],[data-decorate],[data-deco],[data-tx],[data-sheet-close],[data-pick]");
+    if (!t) {
+      if (viewerEl && e.target.classList?.contains("stage")) closeViewer();
+      if (sheetEl && e.target === sheetEl) closeCommons();
+      return;
+    }
     const has = a => t.hasAttribute(a);
-    if (has("data-camera")) { (touch() ? cameraInput : libraryInput).value = ""; (touch() ? cameraInput : libraryInput).click(); }
+    if (has("data-camera")) { const inp = touch() ? cameraInput : libraryInput; inp.value = ""; inp.click(); }
     else if (has("data-library")) { libraryInput.value = ""; libraryInput.click(); }
     else if (t.dataset.open) openViewer(t.dataset.open);
     else if (has("data-close")) closeViewer();
     else if (t.dataset.step) step(Number(t.dataset.step));
     else if (has("data-export")) exportBackup();
     else if (has("data-import")) { importInput.value = ""; importInput.click(); }
-    else if (t.dataset.view) {
-      await store.patchDay(route().date, { view: t.dataset.view });
-      changed(); render();
-    }
-    else if (has("data-decorate")) { state.decorating = true; selectedId = null; render(); }
-    else if (t.dataset.deco) {
-      const a = t.dataset.deco;
-      if (a === "done") { document.activeElement?.blur?.(); clearTimeout(colTimer); if (col) await store.patchDay(colKey, { collage: { items: col.items } }); state.decorating = false; selectedId = null; changed(); render(); }
-      else if (a === "sticker") addItem("sticker", { shape: t.dataset.shape });
-      else addItem(a);
-    }
+    else if (has("data-decorate")) { await flushText(); state.decorating = true; selectedId = null; render(); }
+    else if (t.dataset.deco) decoAction(t.dataset.deco, t);
+    else if (t.dataset.tx) textAction(t);
+    else if (has("data-sheet-close")) closeCommons();
+    else if (t.dataset.pick) pickCommons(t);
     else if (t.dataset.font) {
       const lang = t.dataset.lang;
       try { localStorage.setItem(`diary.hand.${lang}`, t.dataset.font); } catch {}
@@ -813,6 +998,26 @@ export async function mount(root, state) {
       render();
     }
   });
+  on(document, "pointerdown", e => {
+    if (!state.decorating || !boardEl || sheetEl) return;
+    if (boardEl.contains(e.target) || e.target.closest(".decobar")) return;
+    if (document.activeElement?.isContentEditable) document.activeElement.blur();
+    if (selectedId) select(null);
+  });
+  on(document, "submit", e => {
+    if (!e.target.matches?.("[data-commons-form]")) return;
+    e.preventDefault();
+    const q = e.target.q.value.trim(); if (q) searchCommons(q);
+  });
+  // paste an image anywhere on a day page = add it as a photo sticker
+  on(document, "paste", e => {
+    if (route().page !== "day" || viewerEl || sheetEl) return;
+    const file = [...(e.clipboardData?.files || [])].find(f => f.type.startsWith("image/"));
+    if (!file) return;
+    e.preventDefault();
+    addImageBlob(file);
+  });
+  on(stickerInput, "change", async () => { for (const f of [...stickerInput.files]) await addImageBlob(f); });
   on(document, "input", e => {
     const t = e.target;
     if (t.matches?.(".caption")) { grow(t); const id = t.dataset.cap, v = t.value; queueText(`cap:${id}`, () => store.setCaption(id, v)); }
@@ -822,7 +1027,7 @@ export async function mount(root, state) {
   on(libraryInput, "change", () => libraryInput.files.length && addFiles([...libraryInput.files]));
   on(importInput, "change", () => importInput.files[0] && importBackup(importInput.files[0]));
   on(document, "toggle", e => { if (e.target.matches?.(".fonts")) state.fontsOpen = e.target.open; }, { capture: true });
-  on(window, "hashchange", () => { closeViewer(); state.decorating = false; render(); });
+  on(window, "hashchange", () => { closeViewer(); closeCommons(); state.decorating = false; render(); });
   on(window, "scroll", () => { (state.scroll ||= {})[location.hash] = window.scrollY; }, { passive: true });
   on(window, "pagehide", () => flushText());
   on(document, "keydown", e => {
@@ -830,6 +1035,7 @@ export async function mount(root, state) {
     if (state.decorating && selectedId && (e.key === "Delete" || e.key === "Backspace") && !document.activeElement?.isContentEditable) {
       const it = col?.items.find(i => i.id === selectedId); if (it && it.kind !== "photo") removeItem(it.id);
     }
+    if (sheetEl && e.key === "Escape") { closeCommons(); return; }
     if (!viewerEl) return;
     if (e.key === "Escape") closeViewer();
     else if (e.key === "ArrowLeft") step(-1);
@@ -846,6 +1052,7 @@ export async function mount(root, state) {
   return async function unmount() {
     await flushText();
     if (col && colTimer) { clearTimeout(colTimer); await store.patchDay(colKey, { collage: { items: col.items } }); }
+    closeCommons(); stickerInput.remove();
     teardownBoard();
     defsEl.remove();
     clearTimeout(syncTimer);
