@@ -1,4 +1,4 @@
-export const VERSION = "45"; // bump on every change; shown at the bottom of Archive
+export const VERSION = "46"; // bump on every change; shown at the bottom of Archive
 // diary — app code. Loaded (and hot-swapped) by index.html.
 // mount(root, state) draws the app and returns an unmount function.
 
@@ -525,12 +525,16 @@ export async function mount(root, state) {
   const rowOf = new Map(); // auto-placed photo -> [row, drop], for spacing rows by their real height
   function layoutAuto() {
     rowOf.clear();
-    const slot = grid(); let n = 0;
+    // every photo has the spot Tidy up would give it (by the order it was added);
+    // photos you placed stay where they are, new ones go straight to their Tidy up spot
+    const slot = grid();
     const order = dayPhotos.map(p => p.id);
-    col.items.filter(i => i.kind === "photo" && i.auto)
-      .sort((a, b) => order.indexOf(a.ref) - order.indexOf(b.ref))
-      .forEach(i => { const sl = slot(n); Object.assign(i, sl); rowOf.set(i.id, [sl.row, sl.drop]); n++; });
-    const add = slot(n);
+    col.items.filter(i => i.kind === "photo").forEach(i => {
+      const sl = slot(Math.max(0, order.indexOf(i.ref)));
+      if (i.auto) Object.assign(i, sl);
+      rowOf.set(i.id, [sl.row, sl.drop]);
+    });
+    const add = slot(order.length);
     return lookNow() === "loose" ? { ...add, w: Math.min(add.w, .42), rot: 0 } : add; // where the add tile goes
   }
 
@@ -565,14 +569,14 @@ export async function mount(root, state) {
     const extra = (i.kind === "image" && i.outline ? " outline" : "") + (i.kind === "photo" ? ` fr-${i.frame || "print"} lk-${i.look || "none"}` : "");
     const seed = [...i.id].reduce((a, ch) => a + ch.charCodeAt(0), 0);
     const vars = i.kind === "photo" ? `;--w:${i.w};--lift:${(.6 + rnd(seed, 6) * .9).toFixed(2)};--tape-x:${(35 + rnd(seed, 7) * 30).toFixed(0)}%;--tape-r:${((rnd(seed, 8) - .5) * 14).toFixed(1)}deg` : "";
-    const rd = i.auto && rowOf.has(i.id) ? ` data-row="${rowOf.get(i.id)[0]}" data-drop="${rowOf.get(i.id)[1]}"` : "";
+    const rd = rowOf.has(i.id) ? ` data-vrow="${rowOf.get(i.id)[0]}" data-drop="${rowOf.get(i.id)[1]}"${i.auto ? ` data-row="${rowOf.get(i.id)[0]}"` : ""}` : "";
     return `<div class="ci ci-${i.kind}${extra}${i.id === selectedId ? " sel" : ""}" data-id="${i.id}"${rd} style="${pos(i)}${vars}">${inner}${handles}</div>`;
   }
 
   function drawBoard() {
     const addSlot = layoutAuto();
     const add = state.decorating ? "" : `
-      <div class="ci ci-add" data-row="${addSlot.row}" data-drop="${addSlot.drop}" style="${pos({ ...addSlot, rot: 0, z: 0 })}">
+      <div class="ci ci-add" data-row="${addSlot.row}" data-vrow="${addSlot.row}" data-drop="${addSlot.drop}" style="${pos({ ...addSlot, rot: 0, z: 0 })}">
         <button class="add-tile" data-camera>${CAMERA}<span>${touch() ? "Take a photo" : "Add photos"}</span></button>
         ${touch() ? `<button class="link small" data-library>or choose from library</button>` : ""}
       </div>`;
@@ -586,11 +590,9 @@ export async function mount(root, state) {
     const bw = boardEl.clientWidth || 1, loose = lookNow() === "loose";
     const gap = loose ? 6 : 20, els = [...boardEl.querySelectorAll(".ci[data-row]")];
     const tall = [];
-    els.forEach(el => { const r = +el.dataset.row; tall[r] = Math.max(tall[r] || 0, el.offsetHeight + (+el.dataset.drop || 0) * bw); });
-    // photos you placed yourself stay put; new photos start below the lowest of them
-    let locked = 0;
-    boardEl.querySelectorAll(".ci-photo:not([data-row])").forEach(el => { locked = Math.max(locked, el.offsetTop + el.offsetHeight); });
-    const top = []; let y = locked ? locked + gap + 14 : .035 * bw;
+    // row heights come from every photo in its Tidy up row, placed or not, so rows match what Tidy up makes
+    boardEl.querySelectorAll(".ci[data-vrow]").forEach(el => { const r = +el.dataset.vrow; tall[r] = Math.max(tall[r] || 0, el.offsetHeight + (+el.dataset.drop || 0) * bw); });
+    const top = []; let y = .035 * bw;
     for (let r = 0; r < tall.length; r++) { top[r] = y; y += (tall[r] || 0) + gap; }
     els.forEach(el => {
       const yy = (top[+el.dataset.row] + (+el.dataset.drop || 0) * bw) / bw;
