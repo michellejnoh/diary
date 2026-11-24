@@ -4,7 +4,7 @@
 @font-face { font-family: "Gaegu"; src: url("fonts/gaegu.woff2?v=7") format("woff2"); size-adjust: 108%; font-display: swap; }
 @font-face { font-family: "Poor Story"; src: url("fonts/poorstory.woff2?v=7") format("woff2"); size-adjust: 104%; font-display: swap; }
 @font-face { font-family: "Gowun Batang"; src: url("fonts/gowunbatang.woff2?v=7") format("woff2"); size-adjust: 86%; font-display: swap; }
-@font-face { font-family: "Caveat"; src: url("fonts/caveat.woff2?v=7") format("woff2"); size-adjust: 118%; font-display: swap; unicode-range: U+0000-00FF, U+2010-205E, U+20AC; }
+@font-face { font-family: "Caveat"; src: url("fonts/caveat.woff2?v=25") format("woff2"); size-adjust: 118%; font-display: swap; unicode-range: U+0000-00FF, U+2010-205E, U+20AC; }
 @font-face { font-family: "Patrick Hand"; src: url("fonts/patrickhand.woff2?v=7") format("woff2"); size-adjust: 100%; font-display: swap; unicode-range: U+0000-00FF, U+2010-205E, U+20AC; }
 @font-face { font-family: "Indie Flower"; src: url("fonts/indieflower.woff2?v=7") format("woff2"); size-adjust: 92%; font-display: swap; unicode-range: U+0000-00FF, U+2010-205E, U+20AC; }
 @font-face { font-family: "EB Garamond"; src: url("fonts/ebgaramond.woff2?v=7") format("woff2"); size-adjust: 100%; font-display: swap; unicode-range: U+0000-00FF, U+2010-205E, U+20AC; }
@@ -519,6 +519,9 @@ html, body { overflow-x: clip; }
 .pad-ch { font-size: 22px; }
 .pad-area { position: relative; width: 100%; aspect-ratio: 1; background: var(--paper); touch-action: none; box-shadow: inset 0 0 0 1px rgba(44,43,39,.18); }
 .pad-area canvas { position: absolute; inset: 0; touch-action: none; }
+.pad-area { container-type: inline-size; }
+.pad-ghost { position: absolute; inset: 0; display: grid; place-items: center; font: 400 96cqw/1 "Nanum Pen Script", sans-serif; color: rgba(44,43,39,.09); pointer-events: none; }
+.pad-box { position: absolute; display: none; border: 1.5px dashed rgba(185,69,46,.55); border-radius: 2px; background: rgba(185,69,46,.04); pointer-events: none; }
 /* guides: Korean gets a center cross, English gets ascender, x-height and baseline lines (72% = baseline) */
 .pad-area.guide-ko { background-image:
   linear-gradient(90deg, transparent calc(50% - .5px), rgba(80,110,150,.25) calc(50% - .5px), rgba(80,110,150,.25) calc(50% + .5px), transparent calc(50% + .5px)),

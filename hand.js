@@ -1,16 +1,22 @@
 // My handwriting: draw letters and Korean jamo once, then write with them.
 // Glyphs are strokes in a 0–1 box: { strokes: [[x, y, x, y, ...], ...] }.
 
+const CONS = "ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊㅋㅌㅍㅎ", VOWS = "ㅏㅑㅓㅕㅗㅛㅜㅠㅡㅣ";
+// Korean pieces are drawn where they sit in a real syllable, because a consonant changes shape with its spot (가, 고, 각)
 export const HAND_SETS = [
-  { key: "ko-c", name: "한글 자음", chars: "ㄱㄴㄷㄹㅁㅂㅅㅇㅈㅊㅋㅌㅍㅎ", kind: "ko" },
-  { key: "ko-v", name: "한글 모음", chars: "ㅏㅑㅓㅕㅗㅛㅜㅠㅡㅣ", kind: "ko" },
-  { key: "en-l", name: "a–z", chars: "abcdefghijklmnopqrstuvwxyz", kind: "en" },
-  { key: "en-u", name: "A–Z", chars: "ABCDEFGHIJKLMNOPQRSTUVWXYZ", kind: "en" },
-  { key: "num", name: "0–9", chars: "0123456789", kind: "en" },
-  { key: "mark", name: "Marks", chars: ".,!?'\"-:;()~/&", kind: "en" },
+  { key: "ko-v", name: "자음, 가처럼 (왼쪽)", keys: [...CONS].map(c => c + ":v"), kind: "ko" },
+  { key: "ko-h", name: "자음, 고처럼 (위)", keys: [...CONS].map(c => c + ":h"), kind: "ko" },
+  { key: "ko-t", name: "받침, 각처럼 (아래)", keys: [...CONS].map(c => c + ":t"), kind: "ko" },
+  { key: "ko-o", name: "모음, 받침 없을 때", keys: [...VOWS].map(c => c + ":o"), kind: "ko" },
+  { key: "ko-ot", name: "모음, 받침 있을 때", keys: [...VOWS].map(c => c + ":ot"), kind: "ko" },
+  { key: "en-l", name: "a–z", keys: [..."abcdefghijklmnopqrstuvwxyz"], kind: "en" },
+  { key: "en-u", name: "A–Z", keys: [..."ABCDEFGHIJKLMNOPQRSTUVWXYZ"], kind: "en" },
+  { key: "num", name: "0–9", keys: [..."0123456789"], kind: "en" },
+  { key: "mark", name: "Marks", keys: [...".,!?'\"-:;()~/&"], kind: "en" },
 ];
-export const ALL_CHARS = HAND_SETS.map(s => s.chars).join("");
-export const kindOf = ch => HAND_SETS.find(s => s.chars.includes(ch))?.kind || "en";
+export const ALL_KEYS = HAND_SETS.flatMap(s => s.keys);
+export const ALL_CHARS = ALL_KEYS; // kept for older callers
+export const kindOf = k => k.includes(":") || /[\u3131-\u318e]/.test(k) ? "ko" : "en";
 
 // ---------- Korean composition ----------
 const L = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ";
@@ -58,6 +64,23 @@ function jamo(ch, box, g) {
   return fit(glyph.strokes, box);
 }
 
+const strokesOf = (g, k) => g[k]?.strokes?.length ? g[k].strokes : null;
+const firstOf = (g, keys) => { for (const k of keys) { const s = strokesOf(g, k); if (s) return s; } return null; };
+const squeeze = (st, f, top = 0) => st.map(s => s.map((v, i) => i % 2 ? top + v * f : v));
+const shift = (st, a, b, from0, from1) => st.map(s => s.map((v, i) => i % 2 ? a + (v - from0) / (from1 - from0) * (b - a) : v));
+
+// a piece fitted into a box, using the best drawing available (its own spot first)
+function fitPiece(ch, box, g, prefs) {
+  if (PAIRS[ch]) { const [a, b] = split(box); return [...fitPiece(PAIRS[ch][0], a, g, prefs), ...fitPiece(PAIRS[ch][1], b, g, prefs)]; }
+  if (VERT_PAIRS[ch]) {
+    const [x, y, w, h] = box;
+    return [...fitPiece(VERT_PAIRS[ch][0], [x, y, w * .64, h], g, prefs), ...fitPiece("ㅣ", [x + w * .62, y, w * .38, h], g, prefs)];
+  }
+  const st = firstOf(g, [...prefs.map(p => `${ch}:${p}`), ch, `${ch}:v`, `${ch}:h`, `${ch}:t`, `${ch}:o`, `${ch}:ot`]);
+  if (!st) throw 0;
+  return fit(st, box);
+}
+
 export function composeSyllable(ch, g) {
   const code = ch.charCodeAt(0) - 0xac00;
   if (code < 0 || code > 11171) return null;
@@ -65,10 +88,26 @@ export function composeSyllable(ch, g) {
   const type = MIXED[v] ? "m" : HORIZ.includes(v) ? "h" : "v";
   const B = BOX[type + (t ? "T" : "")];
   try {
-    let out = jamo(l, B.L, g);
-    if (type === "m") out = [...out, ...jamo(MIXED[v][0], B.Vh, g), ...jamo(MIXED[v][1], B.Vv, g)];
-    else out = [...out, ...jamo(v, B.V, g)];
-    if (t) out = [...out, ...jamo(t, B.T, g)];
+    const out = [];
+    // first consonant
+    const own = !PAIRS[l] && strokesOf(g, `${l}:${type === "m" ? "h" : type}`);
+    if (own && type !== "m") out.push(...(t ? squeeze(own, type === "v" ? .6 : .66) : own));
+    else out.push(...fitPiece(l, B.L, g, type === "v" ? ["v", "h"] : ["h", "v"]));
+    // vowel
+    if (type === "m") {
+      out.push(...fitPiece(MIXED[v][0], B.Vh, g, t ? ["ot", "o"] : ["o", "ot"]), ...fitPiece(MIXED[v][1], B.Vv, g, t ? ["ot", "o"] : ["o", "ot"]));
+    } else {
+      const drawn = !VERT_PAIRS[v] && strokesOf(g, `${v}:${t ? "ot" : "o"}`);
+      const plain = !VERT_PAIRS[v] && t && strokesOf(g, `${v}:o`);
+      if (drawn) out.push(...drawn);
+      else if (plain) out.push(...(type === "v" ? squeeze(plain, .62) : shift(plain, .33, .62, .5, 1)));
+      else out.push(...fitPiece(v, B.V, g, t ? ["ot", "o"] : ["o", "ot"]));
+    }
+    // bottom consonant
+    if (t) {
+      const fin = !PAIRS[t] && strokesOf(g, `${t}:t`);
+      out.push(...(fin || fitPiece(t, B.T, g, ["t", "v", "h"])));
+    }
     return out;
   } catch { return null; }
 }
@@ -94,9 +133,12 @@ function glyphSVG(ch, g) {
     // syllable box sits on the baseline, 0.78 of the line box tall
     return svg(st.map(s => s.map((v, i) => i % 2 ? .02 + v * .76 : .04 + v * .78)), .86);
   }
+  if (/[\u3131-\u318e]/.test(ch)) {
+    const st = firstOf(g, [ch, `${ch}:v`, `${ch}:o`, `${ch}:h`, `${ch}:t`, `${ch}:ot`]); if (!st) return null;
+    return svg(fit(st, [.1, .1, .8, .8]).map(s => s.map((v, i) => i % 2 ? .02 + v * .76 : .04 + v * .78)), .86);
+  }
   const glyph = g[ch];
   if (!glyph?.strokes?.length) return null;
-  if (kindOf(ch) === "ko") return svg(glyph.strokes.map(s => s.map((v, i) => i % 2 ? .02 + v * .76 : .04 + v * .78)), .86);
   const [x0, , w] = bbox(glyph.strokes);
   const adv = w + .1;
   return svg(glyph.strokes.map(s => s.map((v, i) => i % 2 ? v : v - x0 + .05)), adv);
@@ -104,6 +146,20 @@ function glyphSVG(ch, g) {
 
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 export function hasGlyphs(g) { return g && Object.values(g).some(x => x?.strokes?.length); }
+
+// what the drawing pad shows for a Korean piece: a faint example syllable and the box to draw in
+const S = (l, v, t = "") => String.fromCharCode(0xac00 + L.indexOf(l) * 588 + V.indexOf(v) * 28 + T.indexOf(t));
+export function slotInfo(k) {
+  const [ch, slot] = k.split(":");
+  if (!slot) return null;
+  if (slot === "v") return { ghost: S(ch, "ㅏ"), box: BOX.v.L, label: `${S(ch, "ㅏ")}의 ${ch}` };
+  if (slot === "h") return { ghost: S(ch, "ㅗ"), box: BOX.h.L, label: `${S(ch, "ㅗ")}의 ${ch}` };
+  if (slot === "t") return { ghost: S("ㅇ", "ㅏ", ch), box: BOX.vT.T, label: `${S("ㅇ", "ㅏ", ch)}의 ${ch}` };
+  const hz = HORIZ.includes(ch);
+  if (slot === "o") return { ghost: S("ㅇ", ch), box: hz ? BOX.h.V : BOX.v.V, label: `${S("ㅇ", ch)}의 ${ch}` };
+  if (slot === "ot") return { ghost: S("ㅇ", ch, "ㄴ"), box: hz ? BOX.hT.V : BOX.vT.V, label: `${S("ㅇ", ch, "ㄴ")}의 ${ch}` };
+  return null;
+}
 
 // text -> HTML in your handwriting; characters you haven't drawn fall back to the regular handwriting font
 export function renderHand(text, g) {
@@ -141,16 +197,16 @@ function simplify(pts, eps = .004) {
 }
 
 export function handPageHTML(g, enabled) {
-  const drawn = ALL_CHARS.split("").filter(c => g[c]?.strokes?.length).length;
-  const tile = ch => {
-    const glyph = g[ch];
+  const drawn = ALL_KEYS.filter(k => g[k]?.strokes?.length).length;
+  const tile = k => {
+    const glyph = g[k], info = slotInfo(k);
     const inner = glyph?.strokes?.length
       ? `<svg viewBox="0 0 1 1" aria-hidden="true"><path d="${pathOf(glyph.strokes)}"/></svg>`
-      : `<span class="hint-ch">${esc(ch)}</span>`;
-    return `<button class="htile${glyph?.strokes?.length ? " done" : ""}" data-draw="${esc(ch)}" aria-label="Draw ${esc(ch)}">${inner}</button>`;
+      : `<span class="hint-ch">${esc(info ? info.ghost : k)}</span>`;
+    return `<button class="htile${glyph?.strokes?.length ? " done" : ""}" data-draw="${esc(k)}" aria-label="Draw ${esc(info ? info.label : k)}">${inner}</button>`;
   };
   return `
-    <p class="summary">Draw each letter once. Korean syllables are built from the consonants and vowels. ${drawn} of ${ALL_CHARS.length} drawn.</p>
+    <p class="summary">Draw each piece once, inside the box shown. Korean syllables are built from these. ${drawn} of ${ALL_KEYS.length} drawn.</p>
     <div class="hand-use">
       <button class="chip" data-hand-use="on" aria-pressed="${!!enabled}">Use my handwriting</button>
       <button class="chip" data-hand-use="off" aria-pressed="${!enabled}">Use the font</button>
@@ -160,7 +216,7 @@ export function handPageHTML(g, enabled) {
       <input id="handTry" type="text" value="오늘은 맑음. a good day" autocomplete="off">
       <div class="hand-out" id="handOut">${renderHand("오늘은 맑음. a good day", g)}</div>
     </div>
-    ${HAND_SETS.map(s => `<section class="hset"><h2 class="month-title">${s.name}</h2><div class="htiles">${[...s.chars].map(tile).join("")}</div></section>`).join("")}`;
+    ${HAND_SETS.map(s => `<section class="hset"><h2 class="month-title">${s.name}</h2><div class="htiles">${s.keys.map(tile).join("")}</div></section>`).join("")}`;
 }
 
 // the drawing pad: returns a close function
@@ -168,11 +224,11 @@ export function openPad(ch, g, onSave) {
   const el = document.createElement("div");
   el.className = "pad"; el.setAttribute("role", "dialog"); el.setAttribute("aria-modal", "true");
   let cur = ch, strokes = [], live = null;
-  const order = ALL_CHARS.split("");
+  const order = ALL_KEYS;
   el.innerHTML = `
     <div class="pad-card">
       <div class="pad-head"><span class="pad-ch typed"></span><button class="link" data-pad="close">Close</button></div>
-      <div class="pad-area"><canvas></canvas></div>
+      <div class="pad-area"><span class="pad-ghost" aria-hidden="true"></span><span class="pad-box" aria-hidden="true"></span><canvas></canvas></div>
       <div class="pad-tools">
         <button class="chip" data-pad="undo">Undo</button>
         <button class="chip" data-pad="clear">Clear</button>
@@ -203,8 +259,13 @@ export function openPad(ch, g, onSave) {
   }
   function load(c) {
     cur = c; strokes = (g[c]?.strokes || []).map(s => [...s]); live = null;
-    el.querySelector(".pad-ch").textContent = c;
-    area.className = `pad-area guide-${kindOf(c)}`;
+    const info = slotInfo(c);
+    el.querySelector(".pad-ch").textContent = info ? info.label : c;
+    area.className = `pad-area guide-${info ? "slot" : kindOf(c)}`;
+    const gh = el.querySelector(".pad-ghost"), bx = el.querySelector(".pad-box");
+    gh.textContent = info ? info.ghost : "";
+    if (info) { const [x, y, w, h] = info.box; Object.assign(bx.style, { display: "block", left: x * 100 + "%", top: y * 100 + "%", width: w * 100 + "%", height: h * 100 + "%" }); }
+    else bx.style.display = "none";
     draw();
   }
   const ptr = e => { const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height]; };
