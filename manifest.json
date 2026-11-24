@@ -3,7 +3,7 @@
   "short_name": "diary",
   "start_url": "./",
   "display": "standalone",
-  "background_color": "#D7DAD4",
-  "theme_color": "#D7DAD4",
+  "background_color": "#D5D7CE",
+  "theme_color": "#D5D7CE",
   "icons": [{ "src": "icon.png", "sizes": "512x512", "type": "image/png" }]
 }

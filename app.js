@@ -148,6 +148,30 @@ const LAST_BACKUP = "diary.lastBackup", LAST_CHANGE = "diary.lastChange";
 const photoFile = p => `${p.date}_${p.id}.jpg`;
 const canFolder = "showDirectoryPicker" in window;
 
+// ---------- handwriting fonts ----------
+const FONTS = [
+  { key: "nanumpenscript", family: "Nanum Pen Script", name: "나눔손글씨 펜", scale: 1 },
+  { key: "gaegu", family: "Gaegu", name: "개구", scale: .86 },
+  { key: "gamjaflower", family: "Gamja Flower", name: "감자꽃", scale: .9 },
+  { key: "himelody", family: "Hi Melody", name: "하이멜로디", scale: .9 },
+  { key: "poorstory", family: "Poor Story", name: "푸어스토리", scale: .8 },
+  { key: "yeonsung", family: "Yeon Sung", name: "연성", scale: .84 },
+  { key: "gowunbatang", family: "Gowun Batang", name: "고운바탕", scale: .66 },
+];
+const HAND = "diary.hand";
+const handKey = () => { try { return localStorage.getItem(HAND) || FONTS[0].key; } catch { return FONTS[0].key; } };
+function applyHand(key) {
+  const f = FONTS.find(x => x.key === key) || FONTS[0];
+  document.documentElement.dataset.hand = f.key;
+  document.fonts?.load(`20px "${f.family}"`, "가"); // fetch the whole font now, not mid-typing
+}
+function setBarColor(color) { // Safari top and bottom bars
+  let m = document.querySelector('meta[name="theme-color"]');
+  if (!m) { m = document.createElement("meta"); m.name = "theme-color"; document.head.append(m); }
+  m.content = color;
+}
+const CARD = "#D5D7CE", DARK = "#1A1A17";
+
 // =====================================================================
 export async function mount(root, state) {
   const db = await openDB();
@@ -155,6 +179,8 @@ export async function mount(root, state) {
   const ctl = new AbortController();
   const on = (el, ev, fn, opts = {}) => el.addEventListener(ev, fn, { ...opts, signal: ctl.signal });
 
+  applyHand(handKey());
+  setBarColor(CARD);
   if (navigator.storage?.persist) navigator.storage.persisted().then(p => p || navigator.storage.persist());
 
   let urls = [];
@@ -265,12 +291,12 @@ export async function mount(root, state) {
   }
 
   function backupLine() {
-    if (dir && !dirOK) return `<p class="nudge">Automatic backup is paused. <button class="link" data-resume>Resume backup</button></p>`;
+    if (dir && !dirOK) return `<p class="nudge">Backup paused. <button class="link" data-resume>Resume</button></p>`;
     if (dir) return "";
     if (ls.get(LAST_CHANGE) <= ls.get(LAST_BACKUP)) return "";
     return canFolder
-      ? `<p class="nudge">Back up automatically to a folder on this computer. <button class="link" data-folder>Choose folder</button></p>`
-      : `<p class="nudge">New since your last backup. <button class="link" data-export>Save backup</button></p>`;
+      ? `<p class="nudge">Not backed up. <button class="link" data-folder>Choose backup folder</button></p>`
+      : `<p class="nudge">Not backed up. <button class="link" data-export>Save backup</button></p>`;
   }
 
   // ---------- day page ----------
@@ -357,16 +383,16 @@ export async function mount(root, state) {
     const when = lb ? new Date(lb).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : null;
     let status, actions;
     if (dir && dirOK) {
-      status = `Backing up automatically to the folder “${esc(dir.name)}”. Every photo is saved there as a JPEG, with your writing in diary.json.${when ? ` Last saved ${when}.` : ""}`;
-      actions = `<button class="link" data-folder>Change folder</button><button class="link" data-stopfolder>Stop automatic backup</button>`;
+      status = `Auto backup to “${esc(dir.name)}”.${when ? ` Last ${when}.` : ""}`;
+      actions = `<button class="link" data-folder>Change folder</button><button class="link" data-stopfolder>Stop</button>`;
     } else if (dir) {
-      status = `Automatic backup to “${esc(dir.name)}” is paused until you allow it again.`;
-      actions = `<button class="link" data-resume>Resume backup</button><button class="link" data-stopfolder>Stop automatic backup</button>`;
+      status = `Backup to “${esc(dir.name)}” paused.`;
+      actions = `<button class="link" data-resume>Resume</button><button class="link" data-stopfolder>Stop</button>`;
     } else if (canFolder) {
-      status = `Choose a folder and every photo and note will be copied there by itself as you add them.${when ? ` Last backup ${when}.` : ""}`;
-      actions = `<button class="link" data-folder>Choose backup folder</button><button class="link" data-export>Save backup file</button>`;
+      status = `No auto backup yet.${when ? ` Last backup ${when}.` : ""}`;
+      actions = `<button class="link" data-folder>Choose backup folder</button><button class="link" data-export>Save file</button>`;
     } else {
-      status = `This browser can't save to a folder by itself. Save a backup file to Files or iCloud Drive now and then.${when ? ` Last backup ${when}.` : ""}`;
+      status = when ? `Last backup ${when}.` : `Not backed up yet.`;
       actions = `<button class="link" data-export>Save backup</button>`;
     }
 
@@ -377,14 +403,22 @@ export async function mount(root, state) {
           <a class="link" href="#/">Today</a>
         </header>
         <h1 class="page-title">Archive</h1>
-        <p class="summary">${photoTotal ? `${photoTotal} photo${photoTotal > 1 ? "s" : ""} over ${dates.length} day${dates.length > 1 ? "s" : ""}` : "Your days will collect here."}</p>
+        <p class="summary">${photoTotal ? `${photoTotal} photo${photoTotal > 1 ? "s" : ""} over ${dates.length} day${dates.length > 1 ? "s" : ""}` : "Nothing here yet."}</p>
         <div class="months">${months}</div>
+        <details class="fonts" ${state.fontsOpen ? "open" : ""}>
+          <summary>Handwriting: <span id="handName">${(FONTS.find(f => f.key === handKey()) || FONTS[0]).name}</span></summary>
+          <div class="font-list">${FONTS.map(f => `
+            <button class="font-opt" data-font="${f.key}" aria-pressed="${f.key === handKey()}">
+              <span class="sample" style="font-family:'${f.family}';font-size:${Math.round(26 * f.scale)}px">오늘의 기록</span>
+              <span class="name">${f.name}</span>
+            </button>`).join("")}</div>
+        </details>
         <div class="keep">
           <p>${status}</p>
           <div class="row">${actions}</div>
           <div class="row">
-            <button class="link" data-import>Restore from backup file</button>
-            ${canFolder ? `<button class="link" data-importfolder>Restore from backup folder</button>` : ""}
+            <button class="link" data-import>Restore from file</button>
+            ${canFolder ? `<button class="link" data-importfolder>Restore from folder</button>` : ""}
           </div>
         </div>
       </div>`;
@@ -402,6 +436,7 @@ export async function mount(root, state) {
       viewerEl = document.createElement("div");
       viewerEl.className = "viewer"; viewerEl.setAttribute("role", "dialog"); viewerEl.setAttribute("aria-modal", "true");
       document.body.append(viewerEl);
+      setBarColor(DARK);
     }
     viewerEl.innerHTML = `
       <div class="bar">
@@ -420,6 +455,7 @@ export async function mount(root, state) {
   function closeViewer() {
     state.viewer = null;
     if (viewerEl) { viewerEl.remove(); viewerEl = null; }
+    setBarColor(CARD);
   }
   const step = dir => {
     const i = dayPhotos.findIndex(p => p.id === state.viewer);
@@ -513,7 +549,7 @@ export async function mount(root, state) {
 
   // ---------- events (all removed on unmount) ----------
   on(document, "click", async e => {
-    const t = e.target.closest("[data-camera],[data-library],[data-open],[data-close],[data-step],[data-delete],[data-export],[data-import],[data-folder],[data-resume],[data-stopfolder],[data-importfolder]");
+    const t = e.target.closest("[data-camera],[data-library],[data-open],[data-close],[data-step],[data-delete],[data-export],[data-import],[data-folder],[data-resume],[data-stopfolder],[data-importfolder],[data-font]");
     if (!t) { if (viewerEl && e.target.classList?.contains("stage")) closeViewer(); return; }
     const has = a => t.hasAttribute(a);
     if (has("data-camera")) { (touch() ? cameraInput : libraryInput).value = ""; (touch() ? cameraInput : libraryInput).click(); }
@@ -523,6 +559,12 @@ export async function mount(root, state) {
     else if (t.dataset.step) step(Number(t.dataset.step));
     else if (has("data-export")) exportBackup();
     else if (has("data-import")) { importInput.value = ""; importInput.click(); }
+    else if (t.dataset.font) {
+      try { localStorage.setItem(HAND, t.dataset.font); } catch {}
+      applyHand(t.dataset.font);
+      root.querySelectorAll(".font-opt").forEach(b => b.setAttribute("aria-pressed", String(b === t)));
+      const hn = root.querySelector("#handName"); if (hn) hn.textContent = FONTS.find(f => f.key === t.dataset.font).name;
+    }
     else if (has("data-folder")) chooseFolder();
     else if (has("data-resume")) resumeFolder();
     else if (has("data-importfolder")) importFolder();
@@ -551,6 +593,7 @@ export async function mount(root, state) {
   on(cameraInput, "change", () => cameraInput.files.length && addFiles([...cameraInput.files]));
   on(libraryInput, "change", () => libraryInput.files.length && addFiles([...libraryInput.files]));
   on(importInput, "change", () => importInput.files[0] && importBackup(importInput.files[0]));
+  on(document, "toggle", e => { if (e.target.matches?.(".fonts")) state.fontsOpen = e.target.open; }, { capture: true });
   on(window, "hashchange", () => { closeViewer(); render(); });
   on(window, "scroll", () => { (state.scroll ||= {})[location.hash] = window.scrollY; }, { passive: true });
   on(window, "pagehide", () => flushText());
