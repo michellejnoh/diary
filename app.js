@@ -1,4 +1,4 @@
-export const VERSION = "34"; // bump on every change; shown at the bottom of Archive
+export const VERSION = "35"; // bump on every change; shown at the bottom of Archive
 // diary — app code. Loaded (and hot-swapped) by index.html.
 // mount(root, state) draws the app and returns an unmount function.
 
@@ -444,20 +444,20 @@ export async function mount(root, state) {
     const paper = day.paper || "card";
     const title = isToday
       ? `<span class="soft">Today,</span> ${d.getDate()} ${MONTHS[d.getMonth()]}`
-      : `<span class="soft">${WEEKDAYS[d.getDay()]},</span> ${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
+      : `<span class="soft">${WEEKDAYS[d.getDay()]},</span> ${d.getDate()} ${MONTHS[d.getMonth()]}${d.getFullYear() !== new Date().getFullYear() ? " " + d.getFullYear() : ""}`;
 
     root.innerHTML = `
       <div class="wrap${editing ? " decorating" : ""}">
         <header class="top">
           <a class="wordmark cutmark" href="#/" aria-label="Diary">${cutHTML("Diary")}</a>
-          <a class="navtag" href="#/archive">Archive</a>
-        </header>
-        <div class="dayhead">
-          <div class="daytitle">
+          <div class="daytitle dayhead">
             ${editing ? "" : `<a class="daynav" href="${hrefOf(prevK)}" data-nav="prev" aria-label="Previous day">‹</a>`}
             <h1 class="page-title day-title">${title}</h1>
             ${editing || isToday ? "" : `<a class="daynav" href="${hrefOf(nextK)}" data-nav="next" aria-label="Next day">›</a>`}
           </div>
+        </header>
+        <div class="navrow">
+          <a class="navtag" href="#/archive">Archive</a>
           ${editing ? `<span class="hint typed">Drag to move. Corner handle turns and resizes.</span>` : `<button class="link" data-decorate>Decorate</button>`}
         </div>
         <div class="pagewrap paper-${paper}" id="pagewrap">
@@ -1061,9 +1061,9 @@ export async function mount(root, state) {
       <div class="wrap">
         <header class="top">
           <a class="wordmark cutmark" href="#/" aria-label="Diary">${cutHTML("Diary")}</a>
-          <a class="navtag" href="#/">Today</a>
+          <h1 class="page-title day-title">Archive</h1>
         </header>
-        <h1 class="page-title day-title">Archive</h1>
+        <div class="navrow"><a class="navtag" href="#/">Today</a></div>
         <p class="summary">${photoTotal ? `${photoTotal} photo${photoTotal > 1 ? "s" : ""} over ${dates.length} day${dates.length > 1 ? "s" : ""}` : "Nothing here yet."}</p>
         <div class="months">${months}</div>
 
