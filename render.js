@@ -144,32 +144,47 @@ export async function renderDay(opt) {
   }
   groups.sort((a, b) => Math.abs(a.t - b.t) > 40 ? a.t - b.t : a.l - b.l); // page order
 
-  // try 1–4 columns; keep the one where pictures come out biggest while everything fits the screen
-  const AW = W - 2 * M, AH = bottom - contentTop, gap = 8 * u, MAX = 3.2 * u;
+  // justified rows: each row holds 1–3 groups at one shared height and spans the full width.
+  // Try every way to split the groups (in page order) into rows; keep the one that fills the screen
+  // with the biggest pictures and the most even rows.
+  const AW = W - 2 * M, AH = bottom - contentTop, gap = 10 * u;
+  const n = groups.length, aspect = groups.map(g => g.w / g.h);
+  const splits = [];
+  (function walk(i, acc) {
+    if (splits.length > 4000) return;
+    if (i === n) { splits.push(acc.slice()); return; }
+    for (let k = 1; k <= Math.min(3, n - i); k++) { acc.push(k); walk(i + k, acc); acc.pop(); }
+  })(0, []);
   let plan = null;
-  for (let c = 1; c <= Math.min(4, groups.length); c++) {
-    const cellW = (AW - gap * (c - 1)) / c, rows = [];
-    for (let i = 0; i < groups.length; i += c) rows.push(groups.slice(i, i + c));
-    const rowH = rows.map(r => Math.max(...r.map(g => g.h * Math.min(cellW / g.w, MAX))));
-    const total = rowH.reduce((a, b) => a + b, 0) + gap * (rows.length - 1);
+  for (const sp of splits) {
+    let i = 0; const rows = [];
+    for (const k of sp) {
+      const idx = groups.slice(i, i + k), sumA = aspect.slice(i, i + k).reduce((a, b) => a + b, 0);
+      rows.push({ items: idx, h: (AW - gap * (k - 1)) / sumA, sumA }); i += k;
+    }
+    const total = rows.reduce((a, r) => a + r.h, 0) + gap * (rows.length - 1);
     const f = Math.min(1, (AH - gap * (rows.length - 1)) / (total - gap * (rows.length - 1)));
-    const area = groups.reduce((a, g) => a + g.w * g.h * (Math.min(cellW / g.w, MAX) * f) ** 2, 0);
-    if (!plan || area > plan.area) plan = { c, cellW, rows, rowH, f, area };
+    const hs = rows.map(r => r.h * f), mean = hs.reduce((a, b) => a + b, 0) / hs.length;
+    const spread = Math.sqrt(hs.reduce((a, h) => a + (h - mean) ** 2, 0) / hs.length) / mean; // 0 = all rows the same height
+    const filled = (hs.reduce((a, b) => a + b, 0) + gap * (rows.length - 1)) / AH;           // 1 = fills the screen
+    const widthUsed = rows.reduce((a, r) => a + Math.min(1, (r.h * f * r.sumA + gap * (r.items.length - 1)) / AW), 0) / rows.length;
+    const score = filled * widthUsed - .45 * spread;
+    if (!plan || score > plan.score) plan = { rows, f, score };
   }
-  const { c, cellW, rows, rowH, f } = plan;
-  const usedH = rowH.reduce((a, b) => a + b * f, 0) + gap * (rows.length - 1);
+  const { rows, f } = plan;
+  const usedH = rows.reduce((a, r) => a + r.h * f, 0) + gap * (rows.length - 1);
   let yy = contentTop + Math.max(0, (AH - usedH) / 2);
-  rows.forEach((r, ri) => {
-    let xx = M + (AW - (c * cellW * f + gap * (c - 1))) / 2 + (c - r.length) * (cellW * f + gap) / 2;
-    r.forEach(g => {
-      g.s = Math.min(cellW / g.w, MAX) * f;
-      g.ox = xx + (cellW * f - g.w * g.s) / 2 - g.l * g.s;
-      g.oy = yy + (rowH[ri] * f - g.h * g.s) / 2 - g.t * g.s;
+  for (const r of rows) {
+    const rh = r.h * f, rowW = rh * r.sumA + gap * (r.items.length - 1);
+    let xx = M + (AW - rowW) / 2;
+    for (const g of r.items) {
+      g.s = rh / g.h;
+      g.ox = xx - g.l * g.s; g.oy = yy - g.t * g.s;
       g.members.forEach(m => { m.s = g.s; m.ox = g.ox; m.oy = g.oy; });
-      xx += cellW * f + gap;
-    });
-    yy += rowH[ri] * f + gap;
-  });
+      xx += g.w * g.s + gap;
+    }
+    yy += rh + gap;
+  }
 
   // the day's paper (kraft, grid notebook, black album) behind the photos and the note
   const paper = opt.paper || "card";
