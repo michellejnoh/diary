@@ -62,12 +62,12 @@ header.top { display: flex; align-items: baseline; justify-content: space-betwee
   -webkit-mask-image: var(--ink-wear); mask-image: var(--ink-wear); -webkit-mask-size: 160px; mask-size: 160px;
 }
 /* "diary": the very first look */
-.wordmark { font: 700 32px/1.1 "Spectral", Georgia, serif; letter-spacing: .01em; margin: 0; text-decoration: none; color: var(--ink); }
+.wordmark { font: 700 26px/1.1 "Spectral", Georgia, serif; letter-spacing: .01em; margin: 0; text-decoration: none; color: var(--ink); }
 
 /* Archive / Today / Decorate: italic letterpress words on scraps of tape */
 .navtag {
   display: inline-block; border: 0; padding: 5px 13px 4px; cursor: pointer; text-decoration: none;
-  font: italic 400 19px/1.1 "IM Fell English", Georgia, serif; color: var(--ink);
+  font: italic 400 15px/1.1 "IM Fell English", Georgia, serif; color: var(--ink);
   background-color: var(--tape); background-image: var(--grain); background-blend-mode: multiply;
   clip-path: polygon(0 10%, 3% 0, 7% 9%, 11% 0, 89% 0, 93% 11%, 97% 0, 100% 9%, 100% 91%, 97% 100%, 93% 89%, 89% 100%, 11% 100%, 7% 90%, 3% 100%, 0 89%);
   transform: rotate(-2deg);
@@ -205,8 +205,7 @@ header.top { display: flex; align-items: baseline; justify-content: space-betwee
 .pagewrap.paper-kraft .time { color: #5E4B30; }
 .pagewrap.paper-kraft .caption::placeholder { color: #5E4B30; opacity: .75; }
 .pagewrap.paper-kraft .add-tile { background: #B39468; }
-.paper-album .board.editing { background-image: radial-gradient(rgba(238,235,226,.18) 1px, transparent 1.2px); }
-
+.paper-album 
 /* ---------- photo frames ---------- */
 .ci-photo.fr-instant .frame { padding: 4.5cqw 4.5cqw 20cqw; }
 .ci-photo.fr-film .frame {
@@ -253,7 +252,7 @@ header.top { display: flex; align-items: baseline; justify-content: space-betwee
 .pile-n { margin-left: auto; margin-right: 8px; font-size: 12px; color: var(--pencil); }
 .month-empty { color: var(--pencil); font-size: 14px; margin: 0; }
 
-.dayhead [data-decorate] { font: 400 20px/1.3 var(--type); color: var(--ink); padding: 0; }
+.dayhead [data-decorate] { font: 400 15px/1.3 var(--type); color: var(--ink); padding: 0; }
 .dayhead .hint { color: var(--pencil); font-size: 13px; }
 
 /* ---------- collage board ---------- */
@@ -302,7 +301,6 @@ header.top { display: flex; align-items: baseline; justify-content: space-betwee
 }
 .board:not(.editing) .ci:not(.ci-photo):not(.ci-add) { pointer-events: none; } /* taps go through to photos */
 
-.board.editing { background-image: radial-gradient(rgba(44,43,39,.14) 1px, transparent 1.2px); background-size: 22px 22px; border-radius: 2px; }
 .board.editing .ci { cursor: grab; touch-action: none; }
 .board.editing .ci:active { cursor: grabbing; }
 .board.editing .ci .frame { cursor: inherit; }
@@ -476,7 +474,7 @@ header.top { display: flex; align-items: baseline; justify-content: space-betwee
 .look-loose .ci-photo .tape { left: var(--tape-x, 50%); transform: translateX(-50%) rotate(var(--tape-r, -3deg)); }
 
 /* paper pages get soft, uneven edges */
-.look-loose .pagewrap:not(.paper-card)::before { clip-path: polygon(0.0% 0.80%, 2.5% 0.03%, 5.0% 0.55%, 7.5% 0.20%, 10.0% 0.14%, 12.5% 0.07%, 15.0% 0.92%, 17.5% 0.16%, 20.0% 0.30%, 22.5% 0.47%, 25.0% 1.05%, 27.5% 0.10%, 30.0% 0.54%, 32.5% 0.66%, 35.0% 1.06%, 37.5% 0.98%, 40.0% 1.04%, 42.5% 0.33%, 45.0% 0.50%, 47.5% 0.43%, 50.0% 1.06%, 52.5% 1.15%, 55.0% 0.18%, 57.5% 0.21%, 60.0% 0.28%, 62.5% 0.28%, 65.0% 0.58%, 67.5% 0.71%, 70.0% 0.32%, 72.5% 0.00%, 75.0% 0.50%, 77.5% 0.44%, 80.0% 0.68%, 82.5% 1.14%, 85.0% 0.83%, 87.5% 0.62%, 90.0% 0.74%, 92.5% 0.81%, 95.0% 0.06%, 97.5% 1.08%, 100.0% 0.94%, 99.37% 8.3%, 99.43% 16.7%, 99.72% 25.0%, 99.71% 33.3%, 99.93% 41.7%, 99.54% 50.0%, 99.96% 58.3%, 99.95% 66.7%, 99.85% 75.0%, 99.88% 83.3%, 99.76% 91.7%, 100.0% 99.94%, 97.5% 100.00%, 95.0% 99.82%, 92.5% 99.88%, 90.0% 99.56%, 87.5% 99.97%, 85.0% 98.95%, 82.5% 99.26%, 80.0% 99.82%, 77.5% 99.70%, 75.0% 99.58%, 72.5% 99.56%, 70.0% 99.85%, 67.5% 98.98%, 65.0% 98.81%, 62.5% 99.44%, 60.0% 99.42%, 57.5% 99.90%, 55.0% 99.88%, 52.5% 99.59%, 50.0% 99.68%, 47.5% 99.01%, 45.0% 99.81%, 42.5% 99.97%, 40.0% 98.86%, 37.5% 99.37%, 35.0% 99.82%, 32.5% 99.35%, 30.0% 99.97%, 27.5% 99.37%, 25.0% 98.83%, 22.5% 98.96%, 20.0% 99.16%, 17.5% 99.69%, 15.0% 99.56%, 12.5% 99.80%, 10.0% 99.07%, 7.5% 99.36%, 5.0% 99.07%, 2.5% 99.60%, 0.0% 99.73%, 0.58% 91.7%, 0.71% 83.3%, 0.61% 75.0%, 0.58% 66.7%, 0.59% 58.3%, 0.53% 50.0%, 0.16% 41.7%, 0.37% 33.3%, 0.26% 25.0%, 0.02% 16.7%, 0.02% 8.3%); box-shadow: none; }
+.look-loose .pagewrap:not(.paper-card)::before { clip-path: polygon(0.0% 0.12%, 4.2% 0.27%, 8.3% 0.18%, 12.5% 0.30%, 16.7% 0.31%, 20.8% 0.03%, 25.0% 0.01%, 29.2% 0.42%, 33.3% 0.13%, 37.5% 0.12%, 41.7% 0.50%, 45.8% 0.24%, 50.0% 0.42%, 54.2% 0.24%, 58.3% 0.32%, 62.5% 0.08%, 66.7% 0.32%, 70.8% 0.43%, 75.0% 0.26%, 79.2% 0.37%, 83.3% 0.34%, 87.5% 0.03%, 91.7% 0.38%, 95.8% 0.30%, 100.0% 0.15%, 99.99% 10.0%, 99.78% 20.0%, 99.88% 30.0%, 99.82% 40.0%, 99.78% 50.0%, 99.82% 60.0%, 99.77% 70.0%, 99.90% 80.0%, 99.80% 90.0%, 100.0% 99.78%, 95.8% 99.53%, 91.7% 99.56%, 87.5% 99.95%, 83.3% 99.93%, 79.2% 99.89%, 75.0% 99.52%, 70.8% 99.78%, 66.7% 99.69%, 62.5% 99.85%, 58.3% 99.75%, 54.2% 99.81%, 50.0% 99.82%, 45.8% 99.71%, 41.7% 99.71%, 37.5% 99.55%, 33.3% 99.66%, 29.2% 99.54%, 25.0% 99.57%, 20.8% 99.50%, 16.7% 99.66%, 12.5% 99.92%, 8.3% 99.57%, 4.2% 99.52%, 0.0% 99.55%, 0.14% 90.0%, 0.18% 80.0%, 0.05% 70.0%, 0.21% 60.0%, 0.14% 50.0%, 0.07% 40.0%, 0.02% 30.0%, 0.21% 20.0%, 0.25% 10.0%); box-shadow: none; }
 .look-loose .pagewrap:not(.paper-card) { filter: drop-shadow(0 8px 12px rgba(40,40,34,.18)); }
 
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
