@@ -539,3 +539,12 @@ header.top { padding-bottom: 12px; }
 .daynavs { display: flex; gap: 6px; margin-left: auto; } /* day arrows move to the end of the date line */
 .daysub [data-decorate] { order: -1; margin-left: 0; font: italic 400 15px/1.3 var(--type); color: var(--ink); padding: 0; }
 .archive-title { margin-bottom: 26px !important; }
+
+/* day arrows on both sides of the date; Decorate under the start of the date */
+.daterow { display: flex; align-items: center; gap: 8px; margin-left: -4px; }
+.daterow .daynav { font-size: 20px; padding: 2px 4px; }
+.daynav.off { visibility: hidden; }
+.daysub { padding-left: 22px; }
+.decorating .daysub { padding-left: 0; }
+/* whole top a little lower */
+.wrap { padding-top: 22px; }

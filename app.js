@@ -1,4 +1,4 @@
-export const VERSION = "39"; // bump on every change; shown at the bottom of Archive
+export const VERSION = "40"; // bump on every change; shown at the bottom of Archive
 // diary — app code. Loaded (and hot-swapped) by index.html.
 // mount(root, state) draws the app and returns an unmount function.
 
@@ -453,13 +453,13 @@ export async function mount(root, state) {
           <a class="navtag" href="#/archive">Archive</a>
         </header>
         <div class="dayhead">
-          <h1 class="page-title day-title big-date">${title}</h1>
+          <div class="daterow">
+            ${editing ? "" : `<a class="daynav" href="${hrefOf(prevK)}" data-nav="prev" aria-label="Previous day">‹</a>`}
+            <h1 class="page-title day-title big-date">${title}</h1>
+            ${editing ? "" : isToday ? `<span class="daynav off" aria-hidden="true">›</span>` : `<a class="daynav" href="${hrefOf(nextK)}" data-nav="next" aria-label="Next day">›</a>`}
+          </div>
           <div class="daysub">
-            ${editing ? `<span class="hint typed">Drag to move. Corner handle turns and resizes.</span>` : `<span class="daynavs">
-              <a class="daynav" href="${hrefOf(prevK)}" data-nav="prev" aria-label="Previous day">‹</a>
-              ${isToday ? "" : `<a class="daynav" href="${hrefOf(nextK)}" data-nav="next" aria-label="Next day">›</a>`}
-            </span>
-            <button class="link" data-decorate>Decorate</button>`}
+            ${editing ? `<span class="hint typed">Drag to move. Corner handle turns and resizes.</span>` : `<button class="link" data-decorate>Decorate</button>`}
           </div>
         </div>
         <div class="pagewrap paper-${paper}" id="pagewrap">
