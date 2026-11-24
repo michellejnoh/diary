@@ -14,3 +14,21 @@ A daily photo diary. Many photos a day, a note on each photo, and a film-camera 
 Files: `index.html` (loader), `app.js` (app), `style.css` (look).
 
 On iPhone: open in Safari → Share → Add to Home Screen. This also keeps Safari from clearing the data.
+
+## Cloud account (Firebase)
+
+Sign in with Google on the Archive page to keep the diary in your own account and sync it between devices.
+The browser keeps working offline; changes sync when you're back online.
+
+Setup (once):
+1. https://console.firebase.google.com → Add project.
+2. Authentication → Sign-in method → Google → Enable. Settings → Authorized domains → add `michellejnoh.github.io`.
+3. Firestore Database → Create database (Seoul, production mode) → Rules → paste `firestore.rules` → Publish.
+4. Project settings → Your apps → Web → register → copy the config into `firebase-config.js`.
+
+Photos are stored resized inside Firestore (free tier, no card needed).
+
+## My handwriting
+
+Archive → My handwriting. Draw 14 consonants, 10 vowels, English letters, numbers and marks once.
+Korean syllables are built from the consonants and vowels. Notes and collage text ("Mine") show in your handwriting.

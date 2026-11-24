@@ -1,4 +1,4 @@
-export const VERSION = "21"; // bump on every change; shown at the bottom of Archive
+export const VERSION = "22"; // bump on every change; shown at the bottom of Archive
 // diary — app code. Loaded (and hot-swapped) by index.html.
 // mount(root, state) draws the app and returns an unmount function.
 
@@ -56,6 +56,10 @@ function makeStore(db) {
     t.onerror = () => rej(t.error);
   });
   return {
+    putDay: d => run("days", "readwrite", t => t.objectStore("days").put(d)),
+    delDay: k => run("days", "readwrite", t => t.objectStore("days").delete(k)),
+    allOf: name => run(name, "readonly", t => t.objectStore(name).getAll()),
+    getPhoto: id => run("photos", "readonly", t => t.objectStore("photos").get(id)).then(p => p || null),
     getDay: k => run("days", "readonly", t => t.objectStore("days").get(k)).then(d => d || { date: k }),
     patchDay: (k, patch) => run("days", "readwrite", t => {
       const s = t.objectStore("days");
@@ -69,7 +73,7 @@ function makeStore(db) {
     putPhoto: p => run("photos", "readwrite", t => t.objectStore("photos").put(p)),
     setCaption: (id, caption) => run("photos", "readwrite", t => {
       const s = t.objectStore("photos");
-      s.get(id).onsuccess = e => { const p = e.target.result; if (p) { p.caption = caption; s.put(p); } };
+      s.get(id).onsuccess = e => { const p = e.target.result; if (p) { p.caption = caption; p.updated = Date.now(); s.put(p); } };
     }),
     delPhoto: id => run("photos", "readwrite", t => t.objectStore("photos").delete(id)),
     summary: () => new Promise((res, rej) => {
@@ -222,7 +226,36 @@ const CARD = "#D5D7CE", DARK = "#1A1A17";
 // =====================================================================
 export async function mount(root, state) {
   const db = await openDB();
-  const store = makeStore(db);
+  const raw = makeStore(db);
+  const [H, C] = await Promise.all([import(`./hand.js?v=${VERSION}`), import(`./cloud.js?v=${VERSION}`)]);
+  let cloud = null, cloudStatus = null, cloudConfigured = false;
+  const mark = (col, id) => cloud?.changed(col, id);
+  // every change made in the app is also queued for the cloud
+  const store = {
+    ...raw,
+    patchDay: (k, patch) => raw.patchDay(k, patch).then(() => mark("days", k)),
+    putPhoto: p => { p.updated = Date.now(); return raw.putPhoto(p).then(() => mark("photos", p.id)); },
+    setCaption: (id, c) => raw.setCaption(id, c).then(() => mark("photos", id)),
+    delPhoto: id => raw.delPhoto(id).then(() => mark("photos", id)),
+    putAsset: a => { a.updated = Date.now(); return raw.putAsset(a).then(() => mark("stickers", a.id)); },
+    delAsset: id => raw.delAsset(id).then(() => mark("stickers", id)),
+    setMeta: (k, v) => raw.setMeta(k, v).then(() => { if (k === "hand") mark("meta", k); }),
+  };
+  // the cloud module talks to the browser copy through this (and never marks its own writes)
+  const local = {
+    get: async (col, id) => col === "days" ? (await raw.getDay(id)).updated ? raw.getDay(id) : null
+      : col === "photos" ? raw.getPhoto(id)
+      : col === "stickers" ? (await raw.getAssets([id]))[id] || null
+      : col === "meta" && id === "hand" ? (await raw.getMeta("hand")) || null : null,
+    put: async (col, r) => col === "days" ? raw.putDay(r) : col === "photos" ? raw.putPhoto(r) : col === "stickers" ? raw.putAsset(r)
+      : col === "meta" && r.id === "hand" ? (raw.setMeta("hand", { id: "hand", value: r.value, updated: r.updated }), hand = r.value || {}) : null,
+    del: async (col, id) => col === "days" ? raw.delDay(id) : col === "photos" ? raw.delPhoto(id) : col === "stickers" ? raw.delAsset(id) : col === "meta" ? raw.setMeta(id, null) : null,
+    all: async col => col === "days" ? raw.allOf("days") : col === "photos" ? raw.allOf("photos") : col === "stickers" ? raw.allOf("assets")
+      : col === "meta" ? [await raw.getMeta("hand")].filter(Boolean) : [],
+  };
+  let hand = (await raw.getMeta("hand"))?.value || {};
+  const handOn = () => getPref("diary.handUse", "on") === "on" && H.hasGlyphs(hand);
+  const handHTML = text => H.renderHand(text, hand);
   const ctl = new AbortController();
   const on = (el, ev, fn, opts = {}) => el.addEventListener(ev, fn, { ...opts, signal: ctl.signal });
 
@@ -337,6 +370,7 @@ export async function mount(root, state) {
   const route = () => {
     const h = location.hash;
     if (h === "#/archive") return { page: "archive" };
+    if (h === "#/hand") return { page: "hand" };
     const m = h.match(/^#\/day\/(\d{4}-\d{2}-\d{2})$/);
     if (m && m[1] < todayKey()) return { page: "day", date: m[1] };
     return { page: "day", date: todayKey() };
@@ -352,7 +386,7 @@ export async function mount(root, state) {
     root.style.minHeight = oldH + "px"; // hold the page height so nothing jumps while swapping
     const flip = state.navDir;
     const r = route();
-    if (r.page === "archive") await renderArchive(); else await renderDay(r.date);
+    if (r.page === "archive") await renderArchive(); else if (r.page === "hand") renderHandPage(); else await renderDay(r.date);
     if (state.viewer && r.page === "day") openViewer(state.viewer, false);
     const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (flip && !reduce && r.page === "day") {
@@ -365,7 +399,18 @@ export async function mount(root, state) {
   }
 
   // ---------- day page: one board. Grid by default; Decorate to move things freely ----------
+  let pendingRemote = false;
+  function accountHTML() {
+    if (!cloudConfigured) return `<p>Cloud account isn’t connected yet.</p>`;
+    const st = cloudStatus;
+    if (!st || !st.user) return `<p>Sign in to keep your diary in your own account, on every device.</p><div class="row"><button class="chip" data-signin>Sign in with Google</button></div>`;
+    const t = st.last ? new Date(st.last).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" }) : "";
+    const line = st.state === "syncing" ? "Syncing…" : st.state === "offline" ? "Offline. Changes sync when you’re back online."
+      : st.state === "error" ? `Sync stopped (${esc(st.error || "error")}). Tap Sync now to try again.` : t ? `Synced at ${t}.` : "";
+    return `<p>Signed in as ${esc(st.user.email || st.user.name || "you")}. ${line}</p><div class="row"><button class="link" data-syncnow>Sync now</button><button class="link" data-signout>Sign out</button></div>`;
+  }
   function backupLine() {
+    if (cloudStatus?.user) return "";
     if (dir && !dirOK) return `<p class="nudge">Backup paused. <button class="link" data-resume>Resume</button></p>`;
     if (dir) return "";
     if (ls.get(LAST_CHANGE) <= ls.get(LAST_BACKUP)) return "";
@@ -409,7 +454,8 @@ export async function mount(root, state) {
         <div class="slip">
           <span class="tape" aria-hidden="true"></span>
           <label class="sr" for="note">About the day</label>
-          <textarea class="note" id="note" rows="3" placeholder="how was today?">${esc(day.note || "")}</textarea>
+          ${handOn() && day.note ? `<div class="handview note" data-hv="note" role="button" tabindex="0" aria-label="Edit note">${handHTML(day.note)}</div>` : ""}
+          <textarea class="note${handOn() && day.note ? " hv-hidden" : ""}" id="note" rows="3" placeholder="how was today?">${esc(day.note || "")}</textarea>
         </div>
         </div>
         ${editing ? "" : backupLine()}
@@ -492,10 +538,10 @@ export async function mount(root, state) {
       inner = `<span class="tape" aria-hidden="true"></span>` + (editing
         ? `<div class="frame">${img}</div>${p.caption ? `<p class="ccap">${esc(p.caption)}</p>` : ""}`
         : `<button class="frame" data-open="${p.id}" aria-label="Open photo">${img}</button>
-           <div class="cap">${time}<label class="sr" for="cap-${p.id}">Note for this photo</label><textarea class="caption" id="cap-${p.id}" data-cap="${p.id}" rows="1" placeholder="write about this one">${esc(p.caption)}</textarea></div>`);
+           <div class="cap">${time}<label class="sr" for="cap-${p.id}">Note for this photo</label>${handOn() && p.caption ? `<div class="handview caption" data-hv="cap-${p.id}" role="button" tabindex="0" aria-label="Edit note">${handHTML(p.caption)}</div>` : ""}<textarea class="caption${handOn() && p.caption ? " hv-hidden" : ""}" id="cap-${p.id}" data-cap="${p.id}" rows="1" placeholder="write about this one">${esc(p.caption)}</textarea></div>`);
     } else if (i.kind === "text") {
       const cls = ["ctext", `f-${i.font || "hand"}`, i.hl ? "hl" : "", i.tape ? "taped" : ""].join(" ");
-      inner = `<div class="ctextbox" style="font-size:calc(var(--bw) * ${i.fs})"><span class="${cls}" style="${textStyle(i)}" spellcheck="false">${esc(i.text)}</span></div>`;
+      inner = `<div class="ctextbox" style="font-size:calc(var(--bw) * ${i.fs})"><span class="${cls}" style="${textStyle(i)}" spellcheck="false">${i.font === "mine" ? handHTML(i.text) : esc(i.text)}</span></div>`;
     } else if (i.kind === "tape") {
       inner = `<span class="ctape"></span>`;
     } else if (i.kind === "image") {
@@ -642,11 +688,16 @@ export async function mount(root, state) {
 
   function startTextEdit(el, it) {
     const t = el.querySelector(".ctext");
+    if (it.font === "mine") t.textContent = it.text; // edit as plain text, show as handwriting after
     t.contentEditable = "true"; t.focus();
     const r = document.createRange(); r.selectNodeContents(t); r.collapse(false);
     const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
     t.oninput = () => { it.text = t.innerText.replace(/\n$/, ""); fitBoard(); saveCollage(); };
-    t.onblur = () => { t.contentEditable = "false"; if (!it.text.trim() && col.items.includes(it)) removeItem(it.id); };
+    t.onblur = () => {
+      t.contentEditable = "false";
+      if (!it.text.trim() && col.items.includes(it)) return removeItem(it.id);
+      if (it.font === "mine") { t.innerHTML = handHTML(it.text); fitBoard(); }
+    };
   }
 
   // ---------- dragging ----------
@@ -708,7 +759,7 @@ export async function mount(root, state) {
       add: () => `${b('data-deco="text"', "Text")}${b('data-deco="tape" aria-label="Tape" title="Tape"', `<span class="tape-swatch"></span>`)}${b('data-deco="photo"', "Photo")}${b('data-deco="paste"', "Paste")}${b('data-deco="commons"', "Wikimedia")}`,
       page: () => `<span class="group">${[["card", "Card"], ["kraft", "Kraft"], ["grid", "Grid"], ["album", "Album"]].map(([f, n]) => b(`data-paper="${f}" class="paper-btn pb-${f}"`, n, curPaper() === f)).join("")}</span>
         <span class="group">${[["neat", "Neat"], ["loose", "Loose"]].map(([f, n]) => b(`data-look="${f}"`, n, lookNow() === f)).join("")}</span>${b('data-deco="tidy"', "Tidy up")}`,
-      style: () => `<span class="group">${[["hand", "Hand"], ["type", "Type"], ["press", "Press"]].map(([f, n]) => b(`data-tx="font" data-v="${f}" class="f-${f}"`, n, (it.font || "hand") === f)).join("")}</span>
+      style: () => `<span class="group">${[["hand", "Hand"], ["type", "Type"], ["press", "Press"], ...(H.hasGlyphs(hand) ? [["mine", "Mine"]] : [])].map(([f, n]) => b(`data-tx="font" data-v="${f}" class="f-${f}"`, n, (it.font || "hand") === f)).join("")}</span>
         ${b('data-tx="bold" class="bold"', "B", it.bold)}${b('data-tx="tape" aria-label="Tape behind text"', `<span class="tape-swatch"></span>`, it.tape)}`,
       color: () => COLORS.map(c => b(`data-tx="color" data-v="${c}" class="dot" style="--c:${c}" aria-label="Color ${c}"`, "", (it.color || COLORS[0]) === c)).join(""),
       marker: () => b('data-tx="hl" data-v="" class="hl-none" aria-label="No highlighter"', "", !it.hl) + HILITES.map(c => b(`data-tx="hl" data-v="${c}" class="hl-dot" style="--c:${c}" aria-label="Highlighter ${c}"`, "", it.hl === c)).join(""),
@@ -831,6 +882,27 @@ export async function mount(root, state) {
     } catch { t.classList.remove("loading"); alert("That image couldn’t be loaded. Pick another one."); }
   }
 
+  // ---------- my handwriting ----------
+  let closePad = null;
+  function renderHandPage() {
+    root.innerHTML = `
+      <div class="wrap">
+        <header class="top">
+          <a class="wordmark" href="#/">Diary</a>
+          <a class="navtag" href="#/archive">Archive</a>
+        </header>
+        <h1 class="page-title day-title">My handwriting</h1>
+        <div id="handBody">${H.handPageHTML(hand, handOn())}</div>
+      </div>`;
+    window.scrollTo(0, state.scroll?.[location.hash] || 0);
+  }
+  async function saveGlyph(ch, glyph) {
+    if (glyph) hand[ch] = glyph; else delete hand[ch];
+    await store.setMeta("hand", { id: "hand", value: hand, updated: Date.now() });
+    const body = root.querySelector("#handBody");
+    if (body) { const y = scrollY; const tv = root.querySelector("#handTry")?.value; body.innerHTML = H.handPageHTML(hand, handOn()); if (tv != null) { root.querySelector("#handTry").value = tv; root.querySelector("#handOut").innerHTML = handHTML(tv); } scrollTo(0, y); }
+  }
+
   // ---------- archive page ----------
   async function renderArchive() {
     const sum = await store.summary();
@@ -887,6 +959,10 @@ export async function mount(root, state) {
         <p class="summary">${photoTotal ? `${photoTotal} photo${photoTotal > 1 ? "s" : ""} over ${dates.length} day${dates.length > 1 ? "s" : ""}` : "Nothing here yet."}</p>
         <div class="months">${months}</div>
 
+        <section class="account keep" id="account">${accountHTML()}</section>
+        <div class="lookpick">
+          <a class="chip" href="#/hand">My handwriting</a>
+        </div>
         <div class="lookpick">
           <span class="typed">Page look</span>
           ${[["neat", "Neat grid"], ["loose", "Loose"]].map(([f, n]) => `<button class="chip" data-look="${f}" aria-pressed="${lookNow() === f}">${n}</button>`).join("")}
@@ -965,7 +1041,7 @@ export async function mount(root, state) {
   async function exportBackup() {
     await flushText();
     const { days, photos, assets } = await store.dump();
-    const out = { app: "diary", version: 4, days, photos: [], stickers: [] };
+    const out = { app: "diary", version: 4, days, photos: [], stickers: [], hand };
     for (const a of assets) out.stickers.push({ id: a.id, source: a.source || null, blob: await blobToData(a.blob) });
     for (const p of photos) out.photos.push({ id: p.id, date: p.date, added: p.added, caption: p.caption || "", blob: await blobToData(p.blob), thumb: await blobToData(p.thumb) });
     const name = `diary-backup-${todayKey()}.json`;
@@ -1009,6 +1085,7 @@ export async function mount(root, state) {
     }
     const stickers = [];
     for (const a of data.stickers || []) stickers.push({ id: a.id, source: a.source, blob: await dataToBlob(a.blob) });
+    if (data.hand && typeof data.hand === "object") { hand = data.hand; await store.setMeta("hand", { id: "hand", value: hand, updated: Date.now() }); }
     restoreRecords(days, photos, stickers);
   }
 
@@ -1039,7 +1116,7 @@ export async function mount(root, state) {
 
   // ---------- events (all removed on unmount) ----------
   on(document, "click", async e => {
-    const t = e.target.closest("[data-camera],[data-library],[data-open],[data-close],[data-step],[data-delete],[data-export],[data-import],[data-folder],[data-resume],[data-stopfolder],[data-importfolder],[data-font],[data-decorate],[data-deco],[data-tx],[data-sheet-close],[data-pick],[data-ph],[data-paper],[data-nav],[data-look],[data-dtab],[data-layer]");
+    const t = e.target.closest("[data-camera],[data-library],[data-open],[data-close],[data-step],[data-delete],[data-export],[data-import],[data-folder],[data-resume],[data-stopfolder],[data-importfolder],[data-font],[data-decorate],[data-deco],[data-tx],[data-sheet-close],[data-pick],[data-ph],[data-paper],[data-nav],[data-look],[data-dtab],[data-layer],[data-signin],[data-signout],[data-syncnow],[data-draw],[data-hand-use],[data-hv]");
     if (!t) {
       if (viewerEl && e.target.classList?.contains("stage")) closeViewer();
       if (sheetEl && e.target === sheetEl) closeCommons();
@@ -1058,6 +1135,12 @@ export async function mount(root, state) {
     else if (t.dataset.tx) textAction(t);
     else if (t.dataset.ph) photoAction(t);
     else if (t.dataset.layer) layerAction(t.dataset.layer);
+    else if (has("data-signin")) { try { await cloud?.signIn(); } catch (err) { alert("Sign-in didn’t work. Check your connection and try again."); console.error(err); } }
+    else if (has("data-signout")) { await cloud?.signOut(); }
+    else if (has("data-syncnow")) cloud?.sync();
+    else if (t.dataset.draw) { closePad?.(); closePad = H.openPad(t.dataset.draw, hand, saveGlyph); }
+    else if (t.dataset.handUse) { try { localStorage.setItem("diary.handUse", t.dataset.handUse); } catch {} root.querySelector("#handBody").innerHTML = H.handPageHTML(hand, handOn()); }
+    else if (t.dataset.hv) openHandEdit(t);
     else if (t.dataset.dtab) { decoTab = decoTab === t.dataset.dtab ? null : t.dataset.dtab; renderDecoBar(); }
     else if (t.dataset.paper) setPaper(t.dataset.paper);
     else if (t.dataset.look) {
@@ -1137,8 +1220,25 @@ export async function mount(root, state) {
     addImageBlob(file);
   });
   on(stickerInput, "change", async () => { for (const f of [...stickerInput.files]) await addImageBlob(f); });
+  // a note shown in your handwriting turns into a text box when tapped, and back when you leave it
+  function openHandEdit(view) {
+    const ta = root.querySelector("#" + view.dataset.hv); if (!ta) return;
+    view.remove(); ta.classList.remove("hv-hidden"); grow(ta); ta.focus();
+  }
+  on(document, "focusout", e => {
+    const ta = e.target;
+    if (ta.matches?.("textarea.caption, textarea#note") && handOn() && ta.value.trim()) {
+      const v = document.createElement("div");
+      v.className = `handview ${ta.id === "note" ? "note" : "caption"}`; v.dataset.hv = ta.id;
+      v.setAttribute("role", "button"); v.tabIndex = 0; v.setAttribute("aria-label", "Edit note");
+      v.innerHTML = handHTML(ta.value);
+      ta.before(v); ta.classList.add("hv-hidden"); fitBoard();
+    }
+    if (pendingRemote) setTimeout(() => { if (pendingRemote && !document.activeElement?.matches?.("textarea, input, [contenteditable='true']") && !state.decorating) { pendingRemote = false; render(); } }, 300);
+  });
   on(document, "input", e => {
     const t = e.target;
+    if (t.id === "handTry") { const o = root.querySelector("#handOut"); if (o) o.innerHTML = handHTML(t.value); return; }
     if (t.matches?.(".caption")) { grow(t); const id = t.dataset.cap, v = t.value; queueText(`cap:${id}`, () => store.setCaption(id, v)); }
     else if (t.id === "note") { grow(t); const k = route().date, v = t.value; queueText(`note:${k}`, () => store.patchDay(k, { note: v })); }
   });
@@ -1151,6 +1251,7 @@ export async function mount(root, state) {
   on(window, "pagehide", () => flushText());
   on(document, "keydown", e => {
     if (!viewerEl && (e.key === "Enter" || e.key === " ") && e.target.matches?.(".ci .frame[data-open]")) { e.preventDefault(); openViewer(e.target.dataset.open); return; }
+    if ((e.key === "Enter" || e.key === " ") && e.target.matches?.(".handview")) { e.preventDefault(); openHandEdit(e.target); return; }
     if (state.decorating && selectedId && (e.key === "Delete" || e.key === "Backspace") && !document.activeElement?.isContentEditable) {
       const it = col?.items.find(i => i.id === selectedId); if (it && it.kind !== "photo") removeItem(it.id);
     }
@@ -1172,10 +1273,24 @@ export async function mount(root, state) {
 
   await render();
 
+  try {
+    const cfg = (await import(`./firebase-config.js?v=${VERSION}`)).default;
+    cloudConfigured = !!cfg?.apiKey;
+    if (cloudConfigured) {
+      cloud = await C.startCloud(cfg, local, {
+        onStatus: st => { cloudStatus = st; const a = root.querySelector("#account"); if (a) a.innerHTML = accountHTML(); },
+        onRemoteChange: () => {
+          const busy = state.decorating || document.activeElement?.matches?.("textarea, input, [contenteditable='true']") || sheetEl || document.querySelector(".pad");
+          if (busy) pendingRemote = true; else render();
+        },
+      });
+    }
+  } catch (e) { console.error("diary: cloud not started", e); }
+
   return async function unmount() {
     await flushText();
     if (col && colTimer) { clearTimeout(colTimer); await store.patchDay(colKey, { collage: { items: col.items } }); }
-    closeCommons(); stickerInput.remove();
+    closeCommons(); stickerInput.remove(); cloud?.stop(); document.querySelector(".pad")?.remove();
     teardownBoard();
     defsEl.remove();
     clearTimeout(syncTimer);

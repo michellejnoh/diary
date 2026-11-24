@@ -478,6 +478,62 @@ html, body { overflow-x: clip; }
 .look-loose .pagewrap:not(.paper-card)::before { clip-path: polygon(0.0% 0.12%, 4.2% 0.27%, 8.3% 0.18%, 12.5% 0.30%, 16.7% 0.31%, 20.8% 0.03%, 25.0% 0.01%, 29.2% 0.42%, 33.3% 0.13%, 37.5% 0.12%, 41.7% 0.50%, 45.8% 0.24%, 50.0% 0.42%, 54.2% 0.24%, 58.3% 0.32%, 62.5% 0.08%, 66.7% 0.32%, 70.8% 0.43%, 75.0% 0.26%, 79.2% 0.37%, 83.3% 0.34%, 87.5% 0.03%, 91.7% 0.38%, 95.8% 0.30%, 100.0% 0.15%, 99.99% 10.0%, 99.78% 20.0%, 99.88% 30.0%, 99.82% 40.0%, 99.78% 50.0%, 99.82% 60.0%, 99.77% 70.0%, 99.90% 80.0%, 99.80% 90.0%, 100.0% 99.78%, 95.8% 99.53%, 91.7% 99.56%, 87.5% 99.95%, 83.3% 99.93%, 79.2% 99.89%, 75.0% 99.52%, 70.8% 99.78%, 66.7% 99.69%, 62.5% 99.85%, 58.3% 99.75%, 54.2% 99.81%, 50.0% 99.82%, 45.8% 99.71%, 41.7% 99.71%, 37.5% 99.55%, 33.3% 99.66%, 29.2% 99.54%, 25.0% 99.57%, 20.8% 99.50%, 16.7% 99.66%, 12.5% 99.92%, 8.3% 99.57%, 4.2% 99.52%, 0.0% 99.55%, 0.14% 90.0%, 0.18% 80.0%, 0.05% 70.0%, 0.21% 60.0%, 0.14% 50.0%, 0.07% 40.0%, 0.02% 30.0%, 0.21% 20.0%, 0.25% 10.0%); box-shadow: none; }
 .look-loose .pagewrap:not(.paper-card) { filter: drop-shadow(0 8px 12px rgba(40,40,34,.18)); }
 
+
+/* ================= my handwriting ================= */
+.hg { display: inline-block; height: 1.1em; vertical-align: -.31em; overflow: visible; }
+.hg path { fill: none; stroke: currentColor; stroke-width: .058; stroke-linecap: round; stroke-linejoin: round; }
+.hw { white-space: nowrap; }
+.hf { font-family: var(--hand); }
+.handview { cursor: text; white-space: normal; word-break: keep-all; }
+.handview.caption { font: 400 clamp(16px, 8.5cqw, 26px)/1.25 var(--hand); color: var(--ink); min-height: 1.2em; }
+.handview.note { position: relative; z-index: 1; font: 400 21px/34px var(--hand); min-height: 102px;
+  background-image: linear-gradient(to bottom, transparent 33px, rgba(80,110,150,.28) 33px); background-size: 100% 34px; }
+.hv-hidden { display: none !important; }
+.pagewrap.paper-album .handview.caption { color: #EEEBE2; }
+.ctext.f-mine { font-family: var(--hand); }
+
+.hand-use { display: flex; gap: 8px; margin: -10px 0 18px; }
+.hand-try { max-width: 620px; margin-bottom: 34px; }
+.hand-try input {
+  width: 100%; height: 42px; padding: 0 12px; border: 1px solid rgba(44,43,39,.3); border-radius: 2px;
+  background: var(--paper); font: 400 16px var(--type); color: var(--ink);
+}
+.hand-out { margin-top: 12px; min-height: 44px; font-size: 34px; line-height: 1.3; color: var(--ink); }
+.hset { margin-bottom: 30px; }
+.htiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(56px, 1fr)); gap: 8px; max-width: 760px; }
+.htile {
+  aspect-ratio: 1; padding: 6px; border: 1px solid rgba(44,43,39,.18); border-radius: 2px; cursor: pointer;
+  background: rgba(247,245,239,.45); display: grid; place-items: center; color: var(--ink);
+}
+.htile.done { background: var(--paper); border-color: rgba(44,43,39,.35); }
+.htile svg { width: 100%; height: 100%; overflow: visible; }
+.htile svg path { fill: none; stroke: currentColor; stroke-width: .06; stroke-linecap: round; stroke-linejoin: round; }
+.hint-ch { font: 400 24px var(--hand); color: var(--pencil); opacity: .55; }
+
+.pad { position: fixed; inset: 0; z-index: 30; background: rgba(26,26,23,.45); display: grid; place-items: center; padding: 16px; }
+.pad-card {
+  width: min(440px, 100%); background-color: var(--card); background-image: var(--grain-even); background-blend-mode: soft-light;
+  padding: 14px 16px 16px; box-shadow: 0 12px 30px rgba(0,0,0,.25); border-radius: 3px;
+}
+.pad-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+.pad-ch { font-size: 22px; }
+.pad-area { position: relative; width: 100%; aspect-ratio: 1; background: var(--paper); touch-action: none; box-shadow: inset 0 0 0 1px rgba(44,43,39,.18); }
+.pad-area canvas { position: absolute; inset: 0; touch-action: none; }
+/* guides: Korean gets a center cross, English gets ascender, x-height and baseline lines (72% = baseline) */
+.pad-area.guide-ko { background-image:
+  linear-gradient(90deg, transparent calc(50% - .5px), rgba(80,110,150,.25) calc(50% - .5px), rgba(80,110,150,.25) calc(50% + .5px), transparent calc(50% + .5px)),
+  linear-gradient(transparent calc(50% - .5px), rgba(80,110,150,.25) calc(50% - .5px), rgba(80,110,150,.25) calc(50% + .5px), transparent calc(50% + .5px)); }
+.pad-area.guide-en { background-image:
+  linear-gradient(transparent calc(12% - .5px), rgba(80,110,150,.2) calc(12% - .5px), rgba(80,110,150,.2) calc(12% + .5px), transparent calc(12% + .5px)),
+  linear-gradient(transparent calc(42% - .5px), rgba(80,110,150,.2) calc(42% - .5px), rgba(80,110,150,.2) calc(42% + .5px), transparent calc(42% + .5px)),
+  linear-gradient(transparent calc(72% - 1px), rgba(185,69,46,.45) calc(72% - 1px), rgba(185,69,46,.45) calc(72% + 1px), transparent calc(72% + 1px)); }
+.pad-tools { display: flex; gap: 8px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
+.pad-tools .spacer { flex: 1; }
+.pad-tools .save { background: var(--ink); color: var(--paper); border-color: var(--ink); }
+.account { margin-top: 56px; }
+.account .chip { text-decoration: none; }
+a.chip { text-decoration: none; display: inline-block; }
+
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 /* one moment of motion: a new print develops */
