@@ -631,3 +631,7 @@ header.top { padding-bottom: 12px; }
 .decobar .cancel { padding: 0 8px; font-size: 14px; }
 .decobar .done { padding: 0 12px; font-size: 14px; }
 .deco-end { gap: 2px; }
+
+/* in Decorate, a finger on a piece can still scroll the page; handles stay grab-only */
+.board.editing .ci { touch-action: pan-y; }
+.board.editing .h-rot, .board.editing .h-del { touch-action: none; }

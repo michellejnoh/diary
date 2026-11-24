@@ -1,4 +1,4 @@
-export const VERSION = "51"; // bump on every change; shown at the bottom of Archive
+export const VERSION = "52"; // bump on every change; shown at the bottom of Archive
 // diary — app code. Loaded (and hot-swapped) by index.html.
 // mount(root, state) draws the app and returns an unmount function.
 
@@ -659,7 +659,8 @@ export async function mount(root, state) {
       boardEl.addEventListener("pointerdown", onDown);
       boardEl.addEventListener("pointermove", onMove);
       boardEl.addEventListener("pointerup", onUp);
-      boardEl.addEventListener("pointercancel", onUp);
+      boardEl.addEventListener("pointercancel", onCancel);
+      boardEl.addEventListener("touchmove", e => { if (drag) e.preventDefault(); }, { passive: false }); // once a drag starts, the page stops scrolling
       renderDecoBar();
     }
   }
@@ -805,7 +806,21 @@ export async function mount(root, state) {
   }
 
   // ---------- dragging ----------
+  // On touch screens a finger that moves right away is scrolling, not picking.
+  // A tap picks; holding still for a moment, then moving, drags.
+  let held = null;
   function onDown(e) {
+    if (e.pointerType === "touch" && !e.target.closest(".h-rot, .h-del") && e.target.closest(".ci:not(.ci-add)")
+        && !(e.target.closest(".ctext, .sctext")?.isContentEditable)) {
+      clearTimeout(held?.timer);
+      const fake = { target: e.target, clientX: e.clientX, clientY: e.clientY, pointerId: e.pointerId, pointerType: "touch", preventDefault() {} };
+      held = { fake, x: e.clientX, y: e.clientY, timer: setTimeout(() => { if (held?.fake === fake) { held = null; startDown(fake); } }, 260) };
+      return;
+    }
+    startDown(e);
+  }
+  function onCancel(e) { if (held) { clearTimeout(held.timer); held = null; return; } onUp(e); }
+  function startDown(e) {
     const el = e.target.closest(".ci");
     if (e.target.closest(".h-del")) { e.preventDefault(); removeItem(el.dataset.id); return; }
     if (!el || el.classList.contains("ci-add")) { if (document.activeElement?.isContentEditable) document.activeElement.blur(); select(null); return; }
@@ -827,6 +842,10 @@ export async function mount(root, state) {
     boardEl.setPointerCapture(e.pointerId);
   }
   function onMove(e) {
+    if (held) {
+      if (Math.hypot(e.clientX - held.x, e.clientY - held.y) > 8) { clearTimeout(held.timer); held = null; } // it's a scroll
+      return;
+    }
     if (!drag) return;
     const { it, el } = drag;
     if (drag.mode === "m") {
@@ -846,6 +865,7 @@ export async function mount(root, state) {
     applyPos(el, it);
   }
   function onUp() {
+    if (held) { const f = held.fake; clearTimeout(held.timer); held = null; startDown(f); } // a quick tap still picks
     if (!drag) return;
     const d = drag; drag = null;
     if (d.mode === "m" && !d.moved && d.wasSel && (d.it.kind === "text" || (d.it.kind === "scrap" && d.it.type !== "clip"))) startTextEdit(d.el, d.it);
