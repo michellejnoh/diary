@@ -1,4 +1,4 @@
-export const VERSION = "11"; // bump on every change; shown at the bottom of Archive
+export const VERSION = "12"; // bump on every change; shown at the bottom of Archive
 // diary — app code. Loaded (and hot-swapped) by index.html.
 // mount(root, state) draws the app and returns an unmount function.
 
@@ -61,7 +61,7 @@ function makeStore(db) {
       const s = t.objectStore("days");
       s.get(k).onsuccess = e => {
         const d = Object.assign(e.target.result || { date: k }, patch, { updated: Date.now() });
-        if (!d.note && !d.collage && !d.view) s.delete(k); else s.put(d);
+        if (!d.note && !d.collage && !d.paper) s.delete(k); else s.put(d);
       };
     }),
     photosOn: k => run("photos", "readonly", t => t.objectStore("photos").index("date").getAll(k))
@@ -77,8 +77,8 @@ function makeStore(db) {
       t.objectStore("photos").index("date").openCursor().onsuccess = e => {
         const c = e.target.result; if (!c) return;
         const v = c.value, s = out[v.date];
-        if (!s) out[v.date] = { count: 1, thumb: v.thumb, added: v.added };
-        else { s.count++; if (v.added < s.added) { s.thumb = v.thumb; s.added = v.added; } }
+        if (!s) out[v.date] = { count: 1, thumbs: [{ t: v.thumb, a: v.added }] };
+        else { s.count++; s.thumbs.push({ t: v.thumb, a: v.added }); s.thumbs.sort((x, y) => x.a - y.a); s.thumbs.length = Math.min(3, s.thumbs.length); }
         c.continue();
       };
       t.oncomplete = () => res(out); t.onerror = () => rej(t.error);
@@ -353,21 +353,30 @@ export async function mount(root, state) {
     const [photos, day] = await Promise.all([store.photosOn(k), store.getDay(k)]);
     dayPhotos = photos;
     const editing = !!state.decorating;
+    const prevK = keyOf(new Date(d.getFullYear(), d.getMonth(), d.getDate() - 1));
+    const nextK = keyOf(new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1));
+    const hrefOf = k2 => k2 === todayKey() ? "#/" : `#/day/${k2}`;
+    const slide = state.navDir ? ` slide-${state.navDir}` : ""; state.navDir = null;
+    const paper = day.paper || "card";
     const title = isToday
       ? `<span class="soft">Today,</span> ${d.getDate()} ${MONTHS[d.getMonth()]}`
       : `<span class="soft">${WEEKDAYS[d.getDay()]},</span> ${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
 
     root.innerHTML = `
-      <div class="wrap${editing ? " decorating" : ""}">
+      <div class="wrap${editing ? " decorating" : ""}${slide}">
         <header class="top">
-          <a class="wordmark press" href="#/">Diary</a>
-          <a class="link" href="#/archive">${isToday ? "Archive" : "Back to archive"}</a>
+          <a class="wordmark" href="#/">Diary</a>
+          <a class="navtag" href="#/archive">Archive</a>
         </header>
         <div class="dayhead">
-          <h1 class="page-title day-title">${title}</h1>
-          ${editing ? `<span class="hint typed">Drag to move. Corner handle turns and resizes.</span>` : (photos.length ? `<button class="link" data-decorate>Decorate</button>` : "")}
+          <div class="daytitle">
+            ${editing ? "" : `<a class="daynav" href="${hrefOf(prevK)}" data-nav="prev" aria-label="Previous day">‹</a>`}
+            <h1 class="page-title day-title">${title}</h1>
+            ${editing || isToday ? "" : `<a class="daynav" href="${hrefOf(nextK)}" data-nav="next" aria-label="Next day">›</a>`}
+          </div>
+          ${editing ? `<span class="hint typed">Drag to move. Corner handle turns and resizes.</span>` : `<button class="navtag tag-b" data-decorate>Decorate</button>`}
         </div>
-        <div class="board${editing ? " editing" : ""}" id="board"></div>
+        <div class="board paper-${paper}${editing ? " editing" : ""}" id="board"></div>
         <div class="slip">
           <span class="tape" aria-hidden="true"></span>
           <label class="sr" for="note">About the day</label>
@@ -439,7 +448,7 @@ export async function mount(root, state) {
       inner = `<img class="cimg" src="${url(a.blob)}" alt="" draggable="false">`;
     } else return "";
     const handles = editing ? `<span class="h-rot" data-h="t" title="Turn and resize">${ROTATE_ICON}</span>${i.kind !== "photo" ? `<button class="h-del" data-h="d" aria-label="Remove">×</button>` : ""}` : "";
-    const extra = i.kind === "image" && i.outline ? " outline" : "";
+    const extra = (i.kind === "image" && i.outline ? " outline" : "") + (i.kind === "photo" ? ` fr-${i.frame || "print"} lk-${i.look || "none"}` : "");
     return `<div class="ci ci-${i.kind}${extra}${i.id === selectedId ? " sel" : ""}" data-id="${i.id}" style="${pos(i)}">${inner}${handles}</div>`;
   }
 
@@ -466,6 +475,7 @@ export async function mount(root, state) {
     let z = Math.max(0, ...items.map(i => i.z || 0));
     for (const p of photos) if (!have.has(p.id)) items.push({ id: newId(), kind: "photo", ref: p.id, auto: true, z: ++z });
     col = { items };
+    paperNow = day.paper || "card";
     assets = await store.getAssets(items.filter(i => i.kind === "image").map(i => i.ref));
     boardEl.style.setProperty("--bw", boardEl.clientWidth + "px");
     lastW = boardEl.clientWidth;
@@ -642,7 +652,13 @@ export async function mount(root, state) {
         <span class="group" aria-label="Highlighter">${b('data-tx="hl" data-v="" class="hl-none" aria-label="No highlighter"', "", !it.hl)}${HILITES.map(c => b(`data-tx="hl" data-v="${c}" class="hl-dot" style="--c:${c}" aria-label="Highlighter ${c}"`, "", it.hl === c)).join("")}</span>
         <span class="group">${b('data-tx="tape" class="tape-btn" aria-label="Tape behind text"', `<span class="tape-swatch"></span>`, it.tape)}</span>
         ${b('data-deco="back"', "Send back")}`;
+    } else if (it?.kind === "photo") {
+      html = `
+        <span class="group" aria-label="Frame">${[["print", "Print"], ["instant", "Instant"], ["film", "Film"], ["torn", "Torn"]].map(([f, n]) => b(`data-ph="frame" data-v="${f}"`, n, (it.frame || "print") === f)).join("")}</span>
+        <span class="group" aria-label="Look">${[["none", "Plain"], ["grain", "Grain"], ["warm", "Warm"], ["bw", "B&amp;W"]].map(([f, n]) => b(`data-ph="look" data-v="${f}"`, n, (it.look || "none") === f)).join("")}</span>
+        ${b('data-deco="back"', "Send back")}`;
     } else {
+      const paper = curPaper();
       html = `
         ${b('data-deco="text"', "Text")}
         ${b('data-deco="tape" aria-label="Tape"', `<span class="tape-swatch"></span>`)}
@@ -650,7 +666,7 @@ export async function mount(root, state) {
         ${b('data-deco="paste"', "Paste")}
         ${b('data-deco="commons"', "Wikimedia")}
         ${it?.kind === "image" ? b('data-deco="outline"', "Outline", it.outline) : ""}
-        ${it ? b('data-deco="back"', "Send back") : b('data-deco="tidy"', "Tidy up")}`;
+        ${it ? b('data-deco="back"', "Send back") : `<span class="group" aria-label="Paper">${[["card", "Card"], ["kraft", "Kraft"], ["grid", "Grid"], ["album", "Album"]].map(([f, n]) => b(`data-paper="${f}" class="paper-btn pb-${f}"`, n, paper === f)).join("")}</span>${b('data-deco="tidy"', "Tidy up")}`}`;
     }
     bar.innerHTML = `<div class="decoscroll">${html}</div>${b('class="done" data-deco="done"', "Done")}`;
   }
@@ -675,6 +691,19 @@ export async function mount(root, state) {
       saveCollage();
     }
     else if (a === "outline" && it) { it.outline = !it.outline; redrawItem(it); select(it.id); saveCollage(); }
+  }
+  let paperNow = "card";
+  const curPaper = () => paperNow;
+  function photoAction(t) {
+    const it = col.items.find(i => i.id === selectedId); if (!it) return;
+    it[t.dataset.ph] = t.dataset.v;
+    redrawItem(it); select(it.id); saveCollage();
+  }
+  async function setPaper(v) {
+    paperNow = v;
+    boardEl.className = boardEl.className.replace(/paper-\w+/, `paper-${v}`);
+    await store.patchDay(colKey, { paper: v === "card" ? undefined : v }); changed();
+    renderDecoBar();
   }
   function textAction(t) {
     const it = col.items.find(i => i.id === selectedId); if (!it) return;
@@ -746,22 +775,21 @@ export async function mount(root, state) {
     let months = "";
     for (let y = now.getFullYear(), m = now.getMonth(); y > first.getFullYear() || (y === first.getFullYear() && m >= first.getMonth()); m--) {
       if (m < 0) { m = 11; y--; continue; }
+      const prefix = `${y}-${pad(m + 1)}-`;
+      const days = dates.filter(k => k.startsWith(prefix)).reverse();
       const daysIn = new Date(y, m + 1, 0).getDate();
-      const lead = (new Date(y, m, 1).getDay() + 6) % 7;
-      let cells = "", n = 0;
-      for (let i = 0; i < lead; i++) cells += `<span class="cell blank"></span>`;
-      for (let day = 1; day <= daysIn; day++) {
-        const k = `${y}-${pad(m + 1)}-${pad(day)}`, s = sum[k];
-        if (s) n++;
-        const cls = ["cell", s ? "has" : "", k > tKey ? "future" : "", k === tKey ? "today" : ""].join(" ");
-        cells += `<a class="${cls}" href="${k === tKey ? "#/" : `#/day/${k}`}" aria-label="${day} ${MONTHS[m]}${s ? `, ${s.count} photo${s.count > 1 ? "s" : ""}` : ""}">
-          ${s?.thumb ? `<img src="${url(s.thumb)}" alt="">` : ""}<span class="n">${day}</span>${s && s.count > 1 ? `<span class="k">${s.count}</span>` : ""}</a>`;
-      }
+      const piles = days.map(k => {
+        const s2 = sum[k], dd = fromKey(k);
+        const stack = s2.thumbs.map((th, i) => `<img src="${url(th.t)}" alt="" style="--r:${[-6, 4, -1][i]}deg;--x:${[0, 8, -6][i]}%;z-index:${3 - i}">`).reverse().join("");
+        return `<a class="pile" href="${k === tKey ? "#/" : `#/day/${k}`}" aria-label="${dd.getDate()} ${MONTHS[m]}, ${s2.count} photo${s2.count > 1 ? "s" : ""}">
+          <span class="stack">${stack}</span>
+          <span class="pile-date">${dd.getDate()} <span class="soft">${WEEKDAYS[dd.getDay()].slice(0, 3)}</span>${s2.count > 1 ? `<span class="pile-n">${s2.count}</span>` : ""}</span>
+        </a>`;
+      }).join("");
       months += `
         <section class="month">
-          <h2 class="month-title">${MONTHS[m]} ${y}${n ? `<span class="count">${n} of ${daysIn} days</span>` : ""}</h2>
-          <div class="weekdays" aria-hidden="true"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>
-          <div class="grid">${cells}</div>
+          <h2 class="month-title">${MONTHS[m]} ${y}${days.length ? `<span class="count">${days.length} of ${daysIn} days</span>` : ""}</h2>
+          ${days.length ? `<div class="piles">${piles}</div>` : `<p class="month-empty typed">No photos this month yet.</p>`}
         </section>`;
     }
 
@@ -785,8 +813,8 @@ export async function mount(root, state) {
     root.innerHTML = `
       <div class="wrap">
         <header class="top">
-          <a class="wordmark press" href="#/">Diary</a>
-          <a class="link" href="#/">Today</a>
+          <a class="wordmark" href="#/">Diary</a>
+          <a class="navtag" href="#/">Today</a>
         </header>
         <h1 class="page-title day-title">Archive</h1>
         <p class="summary">${photoTotal ? `${photoTotal} photo${photoTotal > 1 ? "s" : ""} over ${dates.length} day${dates.length > 1 ? "s" : ""}` : "Nothing here yet."}</p>
@@ -835,7 +863,7 @@ export async function mount(root, state) {
         <button class="link" data-close>Close</button>
         <button class="link" data-delete="${p.id}">Delete photo</button>
       </div>
-      <div class="stage"><span class="photo"><img src="${url(p.blob)}" alt="Photo ${i + 1} of ${dayPhotos.length}"></span></div>
+      <div class="stage"><span class="photo lk-${(col?.items.find(x => x.ref === p.id)?.look) || "none"}"><img src="${url(p.blob)}" alt="Photo ${i + 1} of ${dayPhotos.length}"></span></div>
       ${p.caption ? `<p class="vcap">${esc(p.caption)}</p>` : ""}
       <div class="pager">
         <button data-step="-1" aria-label="Previous photo" ${i === 0 ? "disabled" : ""}>‹</button>
@@ -952,7 +980,7 @@ export async function mount(root, state) {
 
   // ---------- events (all removed on unmount) ----------
   on(document, "click", async e => {
-    const t = e.target.closest("[data-camera],[data-library],[data-open],[data-close],[data-step],[data-delete],[data-export],[data-import],[data-folder],[data-resume],[data-stopfolder],[data-importfolder],[data-font],[data-decorate],[data-deco],[data-tx],[data-sheet-close],[data-pick]");
+    const t = e.target.closest("[data-camera],[data-library],[data-open],[data-close],[data-step],[data-delete],[data-export],[data-import],[data-folder],[data-resume],[data-stopfolder],[data-importfolder],[data-font],[data-decorate],[data-deco],[data-tx],[data-sheet-close],[data-pick],[data-ph],[data-paper],[data-nav]");
     if (!t) {
       if (viewerEl && e.target.classList?.contains("stage")) closeViewer();
       if (sheetEl && e.target === sheetEl) closeCommons();
@@ -969,6 +997,9 @@ export async function mount(root, state) {
     else if (has("data-decorate")) { await flushText(); state.decorating = true; selectedId = null; render(); }
     else if (t.dataset.deco) decoAction(t.dataset.deco, t);
     else if (t.dataset.tx) textAction(t);
+    else if (t.dataset.ph) photoAction(t);
+    else if (t.dataset.paper) setPaper(t.dataset.paper);
+    else if (t.dataset.nav) state.navDir = t.dataset.nav === "prev" ? "right" : "left"; // link does the rest
     else if (has("data-sheet-close")) closeCommons();
     else if (t.dataset.pick) pickCommons(t);
     else if (t.dataset.font) {
@@ -1004,6 +1035,27 @@ export async function mount(root, state) {
     if (document.activeElement?.isContentEditable) document.activeElement.blur();
     if (selectedId) select(null);
   });
+  // swipe left/right on a day page = next/previous day
+  let touch0 = null;
+  on(document, "touchstart", e => {
+    if (route().page !== "day" || state.decorating || viewerEl || sheetEl || e.touches.length !== 1) { touch0 = null; return; }
+    if (e.target.closest("textarea, input, .decobar")) { touch0 = null; return; }
+    touch0 = { x: e.touches[0].clientX, y: e.touches[0].clientY, t: Date.now() };
+  }, { passive: true });
+  on(document, "touchend", e => {
+    if (!touch0) return;
+    const dx = e.changedTouches[0].clientX - touch0.x, dy = e.changedTouches[0].clientY - touch0.y;
+    const quick = Date.now() - touch0.t < 600; touch0 = null;
+    if (!quick || Math.abs(dx) < 70 || Math.abs(dy) > Math.abs(dx) * .6) return;
+    goDay(dx < 0 ? 1 : -1);
+  }, { passive: true });
+  function goDay(n) {
+    const k = route().date; if (!k) return;
+    const d = fromKey(k), k2 = keyOf(new Date(d.getFullYear(), d.getMonth(), d.getDate() + n));
+    if (k2 > todayKey()) return;
+    state.navDir = n > 0 ? "left" : "right";
+    location.hash = k2 === todayKey() ? "#/" : `#/day/${k2}`;
+  }
   on(document, "submit", e => {
     if (!e.target.matches?.("[data-commons-form]")) return;
     e.preventDefault();
@@ -1036,7 +1088,11 @@ export async function mount(root, state) {
       const it = col?.items.find(i => i.id === selectedId); if (it && it.kind !== "photo") removeItem(it.id);
     }
     if (sheetEl && e.key === "Escape") { closeCommons(); return; }
-    if (!viewerEl) return;
+    if (!viewerEl) {
+      const typing = e.target.closest?.("textarea, input, [contenteditable='true']");
+      if (!typing && !sheetEl && !state.decorating && route().page === "day" && (e.key === "ArrowLeft" || e.key === "ArrowRight")) goDay(e.key === "ArrowLeft" ? -1 : 1);
+      return;
+    }
     if (e.key === "Escape") closeViewer();
     else if (e.key === "ArrowLeft") step(-1);
     else if (e.key === "ArrowRight") step(1);
