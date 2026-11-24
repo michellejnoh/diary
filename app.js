@@ -12,29 +12,27 @@ const timeOf = ms => {
   const d = new Date(ms); let h = d.getHours(); const ap = h < 12 ? "am" : "pm";
   h = h % 12 || 12; return `${h}:${pad(d.getMinutes())} ${ap}`;
 };
-const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const touch = () => matchMedia("(pointer: coarse)").matches;
 
 // ---------- storage ----------
 // v1: days {date, photo, thumb, note}
 // v2: days {date, note, updated} + photos {id, date, blob, thumb, added}
+// v3: + photos.caption, meta store (backup folder handle)
 function openDB() {
   return new Promise((res, rej) => {
-    const r = indexedDB.open("diary", 2);
+    const r = indexedDB.open("diary", 3);
     r.onupgradeneeded = (e) => {
       const db = r.result, t = r.transaction;
       if (!db.objectStoreNames.contains("days")) db.createObjectStore("days", { keyPath: "date" });
-      if (!db.objectStoreNames.contains("photos")) {
-        const ps = db.createObjectStore("photos", { keyPath: "id" });
-        ps.createIndex("date", "date");
-      }
+      if (!db.objectStoreNames.contains("photos")) db.createObjectStore("photos", { keyPath: "id" }).createIndex("date", "date");
+      if (!db.objectStoreNames.contains("meta")) db.createObjectStore("meta");
       if (e.oldVersion === 1) {
         const days = t.objectStore("days"), photos = t.objectStore("photos");
         days.openCursor().onsuccess = ev => {
           const c = ev.target.result; if (!c) return;
           const v = c.value;
-          if (v.photo) {
-            photos.put({ id: newId(), date: v.date, blob: v.photo, thumb: v.thumb, added: v.updated || Date.now() });
-          }
+          if (v.photo) photos.put({ id: newId(), date: v.date, blob: v.photo, thumb: v.thumb, added: v.updated || Date.now(), caption: "" });
           c.update({ date: v.date, note: v.note || "", updated: v.updated || Date.now() });
           c.continue();
         };
@@ -42,6 +40,7 @@ function openDB() {
     };
     r.onsuccess = () => { const db = r.result; db.onversionchange = () => db.close(); res(db); };
     r.onerror = () => rej(r.error);
+    r.onblocked = () => console.warn("diary: database upgrade waiting for another tab");
   });
 }
 const newId = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -60,9 +59,12 @@ function makeStore(db) {
       note ? t.objectStore("days").put({ date: k, note, updated: Date.now() }) : t.objectStore("days").delete(k)),
     photosOn: k => run("photos", "readonly", t => t.objectStore("photos").index("date").getAll(k))
       .then(a => a.sort((x, y) => x.added - y.added)),
-    addPhoto: p => run("photos", "readwrite", t => t.objectStore("photos").put(p)),
+    putPhoto: p => run("photos", "readwrite", t => t.objectStore("photos").put(p)),
+    setCaption: (id, caption) => run("photos", "readwrite", t => {
+      const s = t.objectStore("photos");
+      s.get(id).onsuccess = e => { const p = e.target.result; if (p) { p.caption = caption; s.put(p); } };
+    }),
     delPhoto: id => run("photos", "readwrite", t => t.objectStore("photos").delete(id)),
-    // per-day summary for the archive: count + first thumb
     summary: () => new Promise((res, rej) => {
       const t = db.transaction("photos", "readonly"); const out = {};
       t.objectStore("photos").index("date").openCursor().onsuccess = e => {
@@ -81,6 +83,8 @@ function makeStore(db) {
       t.oncomplete = () => res(box); t.onerror = () => rej(t.error);
     }),
     count: () => run("photos", "readonly", t => t.objectStore("photos").count()),
+    getMeta: k => run("meta", "readonly", t => t.objectStore("meta").get(k)),
+    setMeta: (k, v) => run("meta", "readwrite", t => v == null ? t.objectStore("meta").delete(k) : t.objectStore("meta").put(v, k)),
   };
 }
 
@@ -105,6 +109,10 @@ function squareThumb(img, size) {
   c.getContext("2d").drawImage(img, (w - m) / 2, (h - m) / 2, m, m, 0, 0, size, size);
   return toBlob(c, 0.8);
 }
+async function thumbFromBlob(blob) {
+  const u = URL.createObjectURL(blob);
+  try { return await squareThumb(await loadImage(u), 240); } finally { URL.revokeObjectURL(u); }
+}
 
 // ---------- 7-segment date stamp ----------
 const SEG = { 0: "abcdef", 1: "bc", 2: "abged", 3: "abgcd", 4: "fgbc", 5: "afgcd", 6: "afgedc", 7: "abc", 8: "abcdefg", 9: "abcdfg" };
@@ -127,11 +135,18 @@ function stampSVG(k) {
   return `<svg viewBox="-1 -1 ${x - 1} 20" fill="#FF7B22" aria-hidden="true"><g transform="skewX(-6) translate(1 0)">${parts.join("")}</g></svg>`;
 }
 
-// ---------- backup ----------
+const CAMERA = `<svg class="cam" viewBox="0 0 40 30" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M3 8.5h8l3-4.5h12l3 4.5h8v18H3z"/><circle cx="20" cy="16.5" r="6.2"/><circle cx="20" cy="16.5" r="2.4"/><path d="M31 12h3"/></svg>`;
+
+// ---------- backup bookkeeping ----------
 const blobToData = b => new Promise(r => { const f = new FileReader(); f.onload = () => r(f.result); f.readAsDataURL(b); });
 const dataToBlob = async d => (await fetch(d)).blob();
-const LAST_BACKUP = "diary.lastBackup";
-const lastBackup = () => { try { return Number(localStorage.getItem(LAST_BACKUP)) || 0; } catch { return 0; } };
+const ls = {
+  get: k => { try { return Number(localStorage.getItem(k)) || 0; } catch { return 0; } },
+  set: (k, v) => { try { localStorage.setItem(k, String(v)); } catch {} },
+};
+const LAST_BACKUP = "diary.lastBackup", LAST_CHANGE = "diary.lastChange";
+const photoFile = p => `${p.date}_${p.id}.jpg`;
+const canFolder = "showDirectoryPicker" in window;
 
 // =====================================================================
 export async function mount(root, state) {
@@ -146,16 +161,88 @@ export async function mount(root, state) {
   const url = b => { const u = URL.createObjectURL(b); urls.push(u); return u; };
   const revoke = () => { urls.forEach(URL.revokeObjectURL); urls = []; };
 
-  let noteTimer = null, pendingNote = null;
-  const flushNote = async () => {
-    clearTimeout(noteTimer);
-    if (pendingNote) { const p = pendingNote; pendingNote = null; await store.setNote(p.k, p.text); }
+  // ---------- automatic folder backup (Chrome / Edge on computers) ----------
+  let dir = canFolder ? await store.getMeta("backupDir") : null;
+  let dirOK = false;
+  if (dir) { try { dirOK = (await dir.queryPermission({ mode: "readwrite" })) === "granted"; } catch { dir = null; } }
+  let syncTimer = null, syncing = false, syncAgain = false;
+
+  async function syncFolder() {
+    if (!dir || !dirOK) return;
+    if (syncing) { syncAgain = true; return; }
+    syncing = true;
+    try {
+      const { days, photos } = await store.dump();
+      const pdir = await dir.getDirectoryHandle("photos", { create: true });
+      const have = new Set();
+      for await (const name of pdir.keys()) have.add(name);
+      const want = new Set();
+      for (const p of photos) {
+        const name = photoFile(p); want.add(name);
+        if (!have.has(name)) {
+          const w = await (await pdir.getFileHandle(name, { create: true })).createWritable();
+          await w.write(p.blob); await w.close();
+        }
+      }
+      for (const name of have) if (/^\d{4}-\d{2}-\d{2}_[a-z0-9-]+\.jpg$/.test(name) && !want.has(name)) await pdir.removeEntry(name);
+      const index = {
+        app: "diary", version: 3, saved: new Date().toISOString(),
+        days: days.map(d => ({ date: d.date, note: d.note, updated: d.updated })),
+        photos: photos.map(p => ({ id: p.id, date: p.date, added: p.added, caption: p.caption || "", file: `photos/${photoFile(p)}` })),
+      };
+      const w = await (await dir.getFileHandle("diary.json", { create: true })).createWritable();
+      await w.write(JSON.stringify(index, null, 1)); await w.close();
+      ls.set(LAST_BACKUP, Date.now());
+    } catch (err) {
+      console.error("diary: folder backup failed", err);
+      if (err.name === "NotAllowedError") dirOK = false;
+    } finally {
+      syncing = false;
+      if (syncAgain) { syncAgain = false; syncFolder(); }
+    }
+  }
+  const changed = () => {
+    ls.set(LAST_CHANGE, Date.now());
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(syncFolder, 2500);
+  };
+  if (dirOK && ls.get(LAST_CHANGE) > ls.get(LAST_BACKUP)) syncFolder();
+
+  async function chooseFolder() {
+    try {
+      dir = await window.showDirectoryPicker({ id: "diary-backup", mode: "readwrite" });
+      await store.setMeta("backupDir", dir); dirOK = true;
+      await syncFolder(); render();
+    } catch (err) { if (err.name !== "AbortError") alert("That folder can't be used. Choose another folder."); }
+  }
+  async function resumeFolder() {
+    try { dirOK = (await dir.requestPermission({ mode: "readwrite" })) === "granted"; } catch { dirOK = false; }
+    if (dirOK) await syncFolder();
+    render();
+  }
+
+  // ---------- pending text (notes + captions), saved after a pause ----------
+  const pending = new Map(); // key -> fn
+  let textTimer = null;
+  const flushText = async () => {
+    clearTimeout(textTimer);
+    if (!pending.size) return;
+    const jobs = [...pending.values()]; pending.clear();
+    for (const job of jobs) await job();
+    changed();
+  };
+  const queueText = (key, job) => {
+    pending.set(key, job);
+    clearTimeout(textTimer);
+    textTimer = setTimeout(flushText, 600);
   };
 
-  // hidden inputs live outside the rendered page
-  const fileInput = Object.assign(document.createElement("input"), { type: "file", accept: "image/*", multiple: true, className: "sr", tabIndex: -1 });
-  const importInput = Object.assign(document.createElement("input"), { type: "file", accept: "application/json,.json", className: "sr", tabIndex: -1 });
-  document.body.append(fileInput, importInput);
+  // hidden inputs
+  const mkInput = (props) => { const i = Object.assign(document.createElement("input"), { type: "file", className: "sr", tabIndex: -1, ...props }); document.body.append(i); return i; };
+  const cameraInput = mkInput({ accept: "image/*" });
+  cameraInput.setAttribute("capture", "environment");
+  const libraryInput = mkInput({ accept: "image/*", multiple: true });
+  const importInput = mkInput({ accept: "application/json,.json" });
 
   // ---------- routing ----------
   const route = () => {
@@ -170,12 +257,20 @@ export async function mount(root, state) {
   let developIds = new Set();
 
   async function render() {
-    await flushNote();
+    await flushText();
     revoke();
     const r = route();
-    state.date = r.date;
     if (r.page === "archive") await renderArchive(); else await renderDay(r.date);
     if (state.viewer && r.page === "day") openViewer(state.viewer, false);
+  }
+
+  function backupLine() {
+    if (dir && !dirOK) return `<p class="nudge">Automatic backup is paused. <button class="link" data-resume>Resume backup</button></p>`;
+    if (dir) return "";
+    if (ls.get(LAST_CHANGE) <= ls.get(LAST_BACKUP)) return "";
+    return canFolder
+      ? `<p class="nudge">Back up automatically to a folder on this computer. <button class="link" data-folder>Choose folder</button></p>`
+      : `<p class="nudge">New since your last backup. <button class="link" data-export>Save backup</button></p>`;
   }
 
   // ---------- day page ----------
@@ -186,56 +281,47 @@ export async function mount(root, state) {
     const title = isToday
       ? `<span class="soft">Today,</span> ${d.getDate()} ${MONTHS[d.getMonth()]}`
       : `<span class="soft">${WEEKDAYS[d.getDay()]},</span> ${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`;
-    const tilts = ["-0.6deg", "0.5deg", "-0.2deg", "0.7deg", "-0.4deg"];
 
     const prints = photos.map((p, i) => `
-      <figure class="print">
-        <button class="frame" data-open="${p.id}" style="--tilt:${tilts[i % tilts.length]}" aria-label="Open photo ${i + 1}">
-          <div class="photo"><img src="${url(p.blob)}" alt="" class="${developIds.has(p.id) ? "developing" : ""}"><div class="stamp">${stampSVG(k)}</div></div>
+      <figure class="print" style="--i:${i}">
+        <span class="tape" aria-hidden="true"></span>
+        <button class="frame" data-open="${p.id}" aria-label="Open photo ${i + 1}">
+          <span class="photo"><img src="${url(p.blob)}" alt="" class="${developIds.has(p.id) ? "developing" : ""}"><span class="stamp">${stampSVG(k)}</span></span>
         </button>
-        ${keyOf(new Date(p.added)) === k ? `<figcaption>${timeOf(p.added)}</figcaption>` : ""}
+        <figcaption>
+          ${keyOf(new Date(p.added)) === k ? `<span class="time">${timeOf(p.added)}</span>` : ""}
+          <label class="sr" for="cap-${p.id}">Note for photo ${i + 1}</label>
+          <textarea class="caption" id="cap-${p.id}" data-cap="${p.id}" rows="1" placeholder="write about this one">${esc(p.caption)}</textarea>
+        </figcaption>
       </figure>`).join("");
     developIds = new Set();
 
-    const add = `<button class="add-tile${photos.length ? " more" : ""}" data-add><span><span class="plus">+</span>${photos.length ? "Add more" : (isToday ? "Add today’s first photo" : "Add a photo")}</span></button>`;
-
-    const count = await store.count();
-    const lb = lastBackup();
-    const nudge = count > 0 && (!lb || Date.now() - lb > 7 * 864e5)
-      ? `<p class="nudge">${lb ? `Last backup was ${Math.floor((Date.now() - lb) / 864e5)} days ago.` : "You haven’t saved a backup yet."} <button class="link" data-export>Save backup</button></p>`
-      : "";
+    const add = `
+      <div class="add">
+        <button class="add-tile" data-camera>${CAMERA}<span>${touch() ? "Take a photo" : "Add photos"}</span></button>
+        ${touch() ? `<button class="link small" data-library>or choose from library</button>` : ""}
+      </div>`;
 
     root.innerHTML = `
       <div class="wrap">
         <header class="top">
           <a class="wordmark" href="#/">diary</a>
-          ${isToday ? `<a class="link" href="#/archive">Archive</a>` : `<a class="link" href="#/archive">Back to archive</a>`}
+          <a class="link" href="#/archive">${isToday ? "Archive" : "Back to archive"}</a>
         </header>
         <h1 class="page-title">${title}</h1>
-        <div class="roll">${prints}<div>${add}</div></div>
-        <div class="note-wrap">
-          <label class="sr" for="note">Note for this day</label>
-          <textarea class="note" id="note" rows="2" placeholder="Write a line about this day…">${esc(note)}</textarea>
-          <span class="saved" id="saved" aria-live="polite">Saved</span>
+        <div class="roll">${prints}${add}</div>
+        <div class="slip">
+          <span class="tape" aria-hidden="true"></span>
+          <label class="sr" for="note">About the day</label>
+          <textarea class="note" id="note" rows="3" placeholder="how was today?">${esc(note)}</textarea>
         </div>
-        ${nudge}
+        ${backupLine()}
       </div>`;
 
-    const ta = root.querySelector("#note");
-    const grow = () => { ta.style.height = "auto"; ta.style.height = ta.scrollHeight + "px"; };
-    grow();
-    on(ta, "input", () => {
-      grow();
-      pendingNote = { k, text: ta.value };
-      clearTimeout(noteTimer);
-      noteTimer = setTimeout(async () => {
-        await flushNote();
-        const s = root.querySelector("#saved");
-        if (s) { s.classList.add("show"); setTimeout(() => s.classList.remove("show"), 1200); }
-      }, 500);
-    });
+    root.querySelectorAll("textarea").forEach(grow);
     window.scrollTo(0, state.scroll?.[location.hash] || 0);
   }
+  const grow = ta => { ta.style.height = "auto"; ta.style.height = ta.scrollHeight + "px"; };
 
   // ---------- archive page ----------
   async function renderArchive() {
@@ -256,8 +342,7 @@ export async function mount(root, state) {
         const k = `${y}-${pad(m + 1)}-${pad(day)}`, s = sum[k];
         if (s) n++;
         const cls = ["cell", s ? "has" : "", k > tKey ? "future" : "", k === tKey ? "today" : ""].join(" ");
-        const href = k === tKey ? "#/" : `#/day/${k}`;
-        cells += `<a class="${cls}" href="${href}" aria-label="${day} ${MONTHS[m]}${s ? `, ${s.count} photo${s.count > 1 ? "s" : ""}` : ""}">
+        cells += `<a class="${cls}" href="${k === tKey ? "#/" : `#/day/${k}`}" aria-label="${day} ${MONTHS[m]}${s ? `, ${s.count} photo${s.count > 1 ? "s" : ""}` : ""}">
           ${s?.thumb ? `<img src="${url(s.thumb)}" alt="">` : ""}<span class="n">${day}</span>${s && s.count > 1 ? `<span class="k">${s.count}</span>` : ""}</a>`;
       }
       months += `
@@ -268,7 +353,23 @@ export async function mount(root, state) {
         </section>`;
     }
 
-    const lb = lastBackup();
+    const lb = ls.get(LAST_BACKUP);
+    const when = lb ? new Date(lb).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : null;
+    let status, actions;
+    if (dir && dirOK) {
+      status = `Backing up automatically to the folder “${esc(dir.name)}”. Every photo is saved there as a JPEG, with your writing in diary.json.${when ? ` Last saved ${when}.` : ""}`;
+      actions = `<button class="link" data-folder>Change folder</button><button class="link" data-stopfolder>Stop automatic backup</button>`;
+    } else if (dir) {
+      status = `Automatic backup to “${esc(dir.name)}” is paused until you allow it again.`;
+      actions = `<button class="link" data-resume>Resume backup</button><button class="link" data-stopfolder>Stop automatic backup</button>`;
+    } else if (canFolder) {
+      status = `Choose a folder and every photo and note will be copied there by itself as you add them.${when ? ` Last backup ${when}.` : ""}`;
+      actions = `<button class="link" data-folder>Choose backup folder</button><button class="link" data-export>Save backup file</button>`;
+    } else {
+      status = `This browser can't save to a folder by itself. Save a backup file to Files or iCloud Drive now and then.${when ? ` Last backup ${when}.` : ""}`;
+      actions = `<button class="link" data-export>Save backup</button>`;
+    }
+
     root.innerHTML = `
       <div class="wrap">
         <header class="top">
@@ -279,10 +380,11 @@ export async function mount(root, state) {
         <p class="summary">${photoTotal ? `${photoTotal} photo${photoTotal > 1 ? "s" : ""} over ${dates.length} day${dates.length > 1 ? "s" : ""}` : "Your days will collect here."}</p>
         <div class="months">${months}</div>
         <div class="keep">
-          <p>Your diary is saved in this browser and stays there when you close it. A backup file keeps a copy safe and moves the diary to another device.${lb ? ` Last backup: ${new Date(lb).toLocaleDateString()}.` : ""}</p>
+          <p>${status}</p>
+          <div class="row">${actions}</div>
           <div class="row">
-            <button class="link" data-export>Save backup</button>
-            <button class="link" data-import>Restore from backup</button>
+            <button class="link" data-import>Restore from backup file</button>
+            ${canFolder ? `<button class="link" data-importfolder>Restore from backup folder</button>` : ""}
           </div>
         </div>
       </div>`;
@@ -291,7 +393,7 @@ export async function mount(root, state) {
 
   // ---------- viewer ----------
   let viewerEl = null;
-  function openViewer(id, push = true) {
+  function openViewer(id, focus = true) {
     const i = dayPhotos.findIndex(p => p.id === id);
     if (i < 0) { closeViewer(); return; }
     state.viewer = id;
@@ -306,13 +408,14 @@ export async function mount(root, state) {
         <button class="link" data-close>Close</button>
         <button class="link" data-delete="${p.id}">Delete photo</button>
       </div>
-      <div class="stage"><div class="photo"><img src="${url(p.blob)}" alt="Photo ${i + 1} of ${dayPhotos.length}"><div class="stamp">${stampSVG(p.date)}</div></div></div>
+      <div class="stage"><span class="photo"><img src="${url(p.blob)}" alt="Photo ${i + 1} of ${dayPhotos.length}"><span class="stamp">${stampSVG(p.date)}</span></span></div>
+      ${p.caption ? `<p class="vcap">${esc(p.caption)}</p>` : ""}
       <div class="pager">
         <button data-step="-1" aria-label="Previous photo" ${i === 0 ? "disabled" : ""}>‹</button>
         <span>${i + 1} of ${dayPhotos.length}</span>
         <button data-step="1" aria-label="Next photo" ${i === dayPhotos.length - 1 ? "disabled" : ""}>›</button>
       </div>`;
-    if (push) viewerEl.querySelector("[data-close]").focus();
+    if (focus) viewerEl.querySelector("[data-close]").focus();
   }
   function closeViewer() {
     state.viewer = null;
@@ -332,100 +435,146 @@ export async function mount(root, state) {
         const img = await loadImage(src);
         const [blob, thumb] = await Promise.all([resize(img, 1800), squareThumb(img, 240)]);
         const id = newId();
-        await store.addPhoto({ id, date: k, blob, thumb, added: Date.now() });
+        await store.putPhoto({ id, date: k, blob, thumb, added: Date.now(), caption: "" });
         developIds.add(id);
       } catch (err) {
         alert(`${err.message} Try a JPEG, PNG or HEIC photo.`);
       } finally { URL.revokeObjectURL(src); }
     }
-    render();
+    changed();
+    await render();
+    const last = [...root.querySelectorAll(".caption")].pop();
+    if (last && !touch()) last.focus({ preventScroll: true });
   }
 
   async function exportBackup() {
+    await flushText();
     const { days, photos } = await store.dump();
-    const out = { app: "diary", version: 2, days, photos: [] };
-    for (const p of photos) out.photos.push({ id: p.id, date: p.date, added: p.added, blob: await blobToData(p.blob), thumb: await blobToData(p.thumb) });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(new Blob([JSON.stringify(out)], { type: "application/json" }));
-    a.download = `diary-backup-${todayKey()}.json`;
-    document.body.append(a); a.click(); a.remove();
-    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-    try { localStorage.setItem(LAST_BACKUP, String(Date.now())); } catch {}
+    const out = { app: "diary", version: 3, days, photos: [] };
+    for (const p of photos) out.photos.push({ id: p.id, date: p.date, added: p.added, caption: p.caption || "", blob: await blobToData(p.blob), thumb: await blobToData(p.thumb) });
+    const name = `diary-backup-${todayKey()}.json`;
+    const file = new File([JSON.stringify(out)], name, { type: "application/json" });
+    try {
+      if (touch() && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file], title: "diary backup" }); // Save to Files / iCloud Drive
+      } else {
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(file); a.download = name;
+        document.body.append(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+      }
+      ls.set(LAST_BACKUP, Date.now());
+    } catch (err) { if (err.name !== "AbortError") alert("The backup couldn't be saved. Try again."); }
+    render();
+  }
+
+  async function restoreRecords(days, photos) {
+    for (const d of days) if (d.note) await store.setNote(d.date, d.note);
+    for (const p of photos) await store.putPhoto(p); // same id = same photo, nothing doubles
+    changed();
+    alert(`Restored ${photos.length} photo${photos.length === 1 ? "" : "s"}.`);
     render();
   }
 
   async function importBackup(file) {
-    try {
-      const data = JSON.parse(await file.text());
-      if (data.app !== "diary") throw new Error();
-      let n = 0;
-      if (data.version === 1) { // one photo per day, note on the day
-        for (const r of data.days) {
-          if (r.note) await store.setNote(r.date, r.note);
-          if (r.photo) { await store.addPhoto({ id: `${r.date}-v1`, date: r.date, blob: await dataToBlob(r.photo), thumb: await dataToBlob(r.thumb), added: r.updated || Date.now() }); n++; }
-        }
-      } else {
-        for (const d of data.days || []) if (d.note) await store.setNote(d.date, d.note);
-        for (const p of data.photos || []) { // same id = same photo, so nothing doubles up
-          await store.addPhoto({ id: p.id, date: p.date, added: p.added, blob: await dataToBlob(p.blob), thumb: await dataToBlob(p.thumb) });
-          n++;
-        }
+    let data;
+    try { data = JSON.parse(await file.text()); if (data.app !== "diary") throw 0; }
+    catch { alert("This file isn’t a diary backup. Choose a file named diary-backup-….json."); return; }
+    const photos = [], days = [];
+    if (data.version === 1) {
+      for (const r of data.days) {
+        if (r.note) days.push({ date: r.date, note: r.note });
+        if (r.photo) photos.push({ id: `${r.date}-v1`, date: r.date, blob: await dataToBlob(r.photo), thumb: await dataToBlob(r.thumb), added: r.updated || Date.now(), caption: "" });
       }
-      alert(`Restored ${n} photo${n === 1 ? "" : "s"}.`);
-      render();
-    } catch {
-      alert("This file isn’t a diary backup. Choose a file named diary-backup-….json.");
+    } else {
+      days.push(...(data.days || []));
+      for (const p of data.photos || []) photos.push({ id: p.id, date: p.date, added: p.added, caption: p.caption || "", blob: await dataToBlob(p.blob), thumb: await dataToBlob(p.thumb) });
+    }
+    restoreRecords(days, photos);
+  }
+
+  async function importFolder() {
+    try {
+      const src = await window.showDirectoryPicker({ id: "diary-backup", mode: "read" });
+      const index = JSON.parse(await (await (await src.getFileHandle("diary.json")).getFile()).text());
+      const pdir = await src.getDirectoryHandle("photos");
+      const photos = [];
+      for (const p of index.photos) {
+        try {
+          const blob = await (await pdir.getFileHandle(p.file.replace(/^photos\//, ""))).getFile();
+          photos.push({ id: p.id, date: p.date, added: p.added, caption: p.caption || "", blob, thumb: await thumbFromBlob(blob) });
+        } catch { /* missing file: skip */ }
+      }
+      restoreRecords(index.days || [], photos);
+    } catch (err) {
+      if (err.name !== "AbortError") alert("That folder isn’t a diary backup. Choose the folder that has diary.json in it.");
     }
   }
 
   // ---------- events (all removed on unmount) ----------
   on(document, "click", async e => {
-    const t = e.target.closest("[data-add],[data-open],[data-close],[data-step],[data-delete],[data-export],[data-import]");
+    const t = e.target.closest("[data-camera],[data-library],[data-open],[data-close],[data-step],[data-delete],[data-export],[data-import],[data-folder],[data-resume],[data-stopfolder],[data-importfolder]");
     if (!t) { if (viewerEl && e.target.classList?.contains("stage")) closeViewer(); return; }
-    if (t.hasAttribute("data-add")) { fileInput.value = ""; fileInput.click(); }
+    const has = a => t.hasAttribute(a);
+    if (has("data-camera")) { (touch() ? cameraInput : libraryInput).value = ""; (touch() ? cameraInput : libraryInput).click(); }
+    else if (has("data-library")) { libraryInput.value = ""; libraryInput.click(); }
     else if (t.dataset.open) openViewer(t.dataset.open);
-    else if (t.hasAttribute("data-close")) closeViewer();
+    else if (has("data-close")) closeViewer();
     else if (t.dataset.step) step(Number(t.dataset.step));
-    else if (t.hasAttribute("data-export")) exportBackup();
-    else if (t.hasAttribute("data-import")) { importInput.value = ""; importInput.click(); }
+    else if (has("data-export")) exportBackup();
+    else if (has("data-import")) { importInput.value = ""; importInput.click(); }
+    else if (has("data-folder")) chooseFolder();
+    else if (has("data-resume")) resumeFolder();
+    else if (has("data-importfolder")) importFolder();
+    else if (has("data-stopfolder")) { await store.setMeta("backupDir", null); dir = null; dirOK = false; render(); }
     else if (t.dataset.delete) {
       if (!t.classList.contains("danger-armed")) {
         t.classList.add("danger-armed"); t.textContent = "Tap again to delete";
         setTimeout(() => { if (t.isConnected) { t.classList.remove("danger-armed"); t.textContent = "Delete photo"; } }, 3000);
         return;
       }
-      const i = dayPhotos.findIndex(p => p.id === t.dataset.delete);
-      await store.delPhoto(t.dataset.delete);
+      const id = t.dataset.delete;
+      const i = dayPhotos.findIndex(p => p.id === id);
+      await store.delPhoto(id);
+      changed();
       const next = dayPhotos[i + 1] || dayPhotos[i - 1];
-      state.viewer = next && next.id !== t.dataset.delete ? next.id : null;
+      state.viewer = next ? next.id : null;
       if (!state.viewer) closeViewer();
       render();
     }
   });
-  on(fileInput, "change", () => fileInput.files.length && addFiles([...fileInput.files]));
+  on(document, "input", e => {
+    const t = e.target;
+    if (t.matches?.(".caption")) { grow(t); const id = t.dataset.cap, v = t.value; queueText(`cap:${id}`, () => store.setCaption(id, v)); }
+    else if (t.id === "note") { grow(t); const k = route().date, v = t.value; queueText(`note:${k}`, () => store.setNote(k, v)); }
+  });
+  on(cameraInput, "change", () => cameraInput.files.length && addFiles([...cameraInput.files]));
+  on(libraryInput, "change", () => libraryInput.files.length && addFiles([...libraryInput.files]));
   on(importInput, "change", () => importInput.files[0] && importBackup(importInput.files[0]));
   on(window, "hashchange", () => { closeViewer(); render(); });
   on(window, "scroll", () => { (state.scroll ||= {})[location.hash] = window.scrollY; }, { passive: true });
+  on(window, "pagehide", () => flushText());
   on(document, "keydown", e => {
     if (!viewerEl) return;
     if (e.key === "Escape") closeViewer();
     else if (e.key === "ArrowLeft") step(-1);
     else if (e.key === "ArrowRight") step(1);
   });
-  // date rolls over while open
   let lastToday = todayKey();
   on(document, "visibilitychange", () => {
-    if (document.visibilityState === "visible" && todayKey() !== lastToday) { lastToday = todayKey(); render(); }
+    if (document.visibilityState === "hidden") flushText();
+    else if (todayKey() !== lastToday) { lastToday = todayKey(); render(); }
   });
 
   await render();
 
   return async function unmount() {
-    await flushNote();
+    await flushText();
+    clearTimeout(syncTimer);
     ctl.abort();
     revoke();
     if (viewerEl) { viewerEl.remove(); viewerEl = null; }
-    fileInput.remove(); importInput.remove();
+    cameraInput.remove(); libraryInput.remove(); importInput.remove();
     db.close();
   };
 }
