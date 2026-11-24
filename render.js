@@ -82,17 +82,11 @@ export async function renderDay(opt) {
 
   // ---- header: cut-out "Diary" and the date ----
   const M = 22 * u; let y = 34 * u;
-  const letters = await Promise.all([..."diary"].map(c => loadImg(`cutout/${c}.webp`).catch(() => null)));
-  let x = M; const lh = 44 * u, tilts = [-4, 3, -2, 5, -3];
-  letters.forEach((img, i) => {
-    if (!img) return;
-    const w = img.naturalWidth * lh / img.naturalHeight;
-    ctx.save(); ctx.translate(x + w / 2, y + lh / 2); ctx.rotate(tilts[i] * Math.PI / 180);
-    ctx.shadowColor = "rgba(30,30,25,.28)"; ctx.shadowBlur = 2 * u; ctx.shadowOffsetY = 1 * u;
-    ctx.drawImage(img, -w / 2, -lh / 2, w, lh); ctx.restore();
-    x += w + 1.5 * u;
-  });
-  y += lh + 22 * u;
+  await document.fonts.load('56px "IM Fell English"').catch(() => {});
+  const lh = 50 * u;
+  ctx.font = `${56 * u}px "IM Fell English", Georgia, serif`; ctx.fillStyle = "#24231F";
+  ctx.fillText("Diary", M, y + lh * .85);
+  y += lh + 34 * u;
   ctx.font = `${22 * u}px "Special Elite", "Courier New", monospace`; ctx.textBaseline = "alphabetic";
   ctx.fillStyle = PENCIL; ctx.fillText(titleSoft, M, y);
   ctx.fillStyle = INK; ctx.fillText(titleMain, M + ctx.measureText(titleSoft + " ").width, y);
@@ -162,6 +156,9 @@ export async function renderDay(opt) {
       const idx = groups.slice(i, i + k), sumA = aspect.slice(i, i + k).reduce((a, b) => a + b, 0);
       rows.push({ items: idx, h: (AW - gap * (k - 1)) / sumA, sumA }); i += k;
     }
+    // no row may be much taller than the others (a lone photo would otherwise fill the whole width)
+    const minH = Math.min(...rows.map(r => r.h));
+    rows.forEach(r => { r.h = Math.min(r.h, minH * 1.25, AW * .62 / Math.max(.2, r.sumA / r.items.length)); });
     const total = rows.reduce((a, r) => a + r.h, 0) + gap * (rows.length - 1);
     const f = Math.min(1, (AH - gap * (rows.length - 1)) / (total - gap * (rows.length - 1)));
     const hs = rows.map(r => r.h * f), mean = hs.reduce((a, b) => a + b, 0) / hs.length;
@@ -226,6 +223,7 @@ export async function renderDay(opt) {
       shadow(ctx, s, .6); ctx.shadowOffsetX = 0; ctx.drawImage(imgs[it.id], 0, 0, w, h);
     }
     else if (it.kind === "tape") { ctx.fillStyle = TAPE; ctx.fillRect(0, 0, w, h); }
+    else if (it.kind === "scrap") drawScrap(ctx, it, w, h, s);
     else if (it.kind === "text") drawText(ctx, g, el, s, cutImgs, colors);
     ctx.restore();
   }
@@ -307,4 +305,33 @@ function drawText(ctx, g, el, s, cutImgs, colors) {
     ctx.fillText(line, 4 * s + (it.tape ? size * .4 : 0), y + lh * .78);
     y += lh;
   }
+}
+
+function drawScrap(ctx, it, w, h, s) {
+  const cq = w / 100, text = it.text || "";
+  shadow(ctx, s, .6);
+  if (it.type === "clip") {
+    noShadow(ctx); ctx.strokeStyle = "#8E918A"; ctx.lineWidth = 2.2 * w / 20; ctx.lineCap = "round";
+    const k = w / 20; ctx.beginPath();
+    ctx.moveTo(14 * k, 18 * k); ctx.lineTo(14 * k, 44 * k); ctx.arc(9 * k, 44 * k, 5 * k, 0, Math.PI); ctx.lineTo(4 * k, 10 * k);
+    ctx.arc(10.5 * k, 10 * k, 6.5 * k, Math.PI, 0); ctx.lineTo(17 * k, 44 * k); ctx.stroke(); return;
+  }
+  const fill = { ticket: "#D8C6A0", receipt: "#FBFAF5", stamp: "#FBFAF5", note: "#FBFAF5", label: "#1F1E1B" }[it.type] || PAPER;
+  ctx.fillStyle = fill;
+  if (it.type === "ticket") {
+    ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(w, 0); ctx.lineTo(w, h / 2 - 6 * cq); ctx.arc(w, h / 2, 6 * cq, -Math.PI / 2, Math.PI / 2, true);
+    ctx.lineTo(w, h); ctx.lineTo(0, h); ctx.lineTo(0, h / 2 + 6 * cq); ctx.arc(0, h / 2, 6 * cq, Math.PI / 2, -Math.PI / 2, true); ctx.closePath(); ctx.fill();
+  } else ctx.fillRect(0, 0, w, h);
+  noShadow(ctx);
+  const font = { ticket: `${9 * cq}px "Special Elite", monospace`, receipt: `${9.5 * cq}px "Special Elite", monospace`, stamp: `${15 * cq}px "Caveat", "Nanum Pen Script"`, note: `${9 * cq}px "Caveat", "Nanum Pen Script"`, label: `700 ${9 * cq}px "Courier New", monospace` }[it.type];
+  if (it.type === "stamp") { ctx.fillStyle = "#A83D28"; ctx.fillRect(9 * cq, 9 * cq, w - 18 * cq, h - 18 * cq); }
+  if (it.type === "note") { ctx.strokeStyle = "rgba(80,110,150,.3)"; ctx.lineWidth = .6 * cq; for (let ly = 18.4 * cq; ly < h; ly += 11 * cq) { ctx.beginPath(); ctx.moveTo(0, ly); ctx.lineTo(w, ly); ctx.stroke(); } }
+  ctx.font = font; ctx.fillStyle = it.type === "label" || it.type === "stamp" ? "#F2F0E8" : it.type === "ticket" ? "#4A3A22" : INK;
+  const pad = { ticket: 12, receipt: 10, stamp: 14, note: 16, label: 6 }[it.type] * cq;
+  const lines = wrapLines(ctx, it.type === "label" ? text.toUpperCase() : text, w - 2 * pad);
+  const lh = (it.type === "note" ? 11 : it.type === "receipt" ? 13.8 : 12) * cq;
+  let y0 = it.type === "ticket" || it.type === "stamp" || it.type === "label" ? h / 2 - (lines.length * lh) / 2 + lh * .75 : 16 * cq;
+  ctx.textAlign = it.type === "ticket" || it.type === "stamp" ? "center" : "left";
+  lines.forEach((t, i) => ctx.fillText(t, ctx.textAlign === "center" ? w / 2 : pad, y0 + i * lh));
+  ctx.textAlign = "left";
 }

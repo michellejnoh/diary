@@ -523,6 +523,64 @@ img.cut, .cut-scrap {
 .ctext.f-cut { font-family: var(--type); line-height: 1.35; }
 .decobar button.f-cut { font-family: Georgia, serif; font-weight: 700; letter-spacing: .02em; }
 
+
+/* "Diary" in IM Fell English, as big as the cut-out letters were */
+.wordmark.bigmark { font-size: clamp(46px, 14.5vw, 66px); line-height: .95; letter-spacing: -.01em; }
+
+/* ---------- paper scraps ---------- */
+.ci-scrap { container-type: inline-size; }
+.scrap { position: relative; display: block; color: var(--ink); filter: drop-shadow(0 1px 1px rgba(40,40,34,.25)) drop-shadow(0 5px 6px rgba(40,40,34,.18)); }
+.sctext { display: block; outline: none; white-space: pre-wrap; word-break: keep-all; min-height: 1em; }
+.sctext:empty::before { content: attr(data-ph); opacity: .4; }
+.board:not(.editing) .sctext:empty::before { content: ""; }
+.board.editing .sctext[contenteditable="true"] { cursor: text; outline: 1px dashed rgba(44,43,39,.3); }
+
+.sc-ticket {
+  aspect-ratio: 2.3 / 1; display: grid; place-items: center; padding: 0 12cqw; text-align: center;
+  background-color: #D8C6A0; background-image: var(--grain), linear-gradient(90deg, transparent 76%, rgba(60,45,25,.0) 76%);
+  -webkit-mask: radial-gradient(circle 6cqw at 0 50%, transparent 98%, #000) left / 51% 100% no-repeat, radial-gradient(circle 6cqw at 100% 50%, transparent 98%, #000) right / 51% 100% no-repeat;
+  mask: radial-gradient(circle 6cqw at 0 50%, transparent 98%, #000) left / 51% 100% no-repeat, radial-gradient(circle 6cqw at 100% 50%, transparent 98%, #000) right / 51% 100% no-repeat;
+}
+.sc-ticket::after { content: ""; position: absolute; inset: 7cqw 9cqw; border: .7cqw dashed rgba(60,45,25,.45); pointer-events: none; }
+.sc-ticket .sctext { font: 400 9cqw/1.15 var(--type); letter-spacing: .06em; color: #4A3A22; }
+
+.sc-receipt {
+  min-height: 120cqw; padding: 12cqw 10cqw 16cqw; background: #FBFAF5;
+  clip-path: polygon(0.0% 0cqw, 7.1% 4cqw, 14.3% 0cqw, 21.4% 4cqw, 28.6% 0cqw, 35.7% 4cqw, 42.9% 0cqw, 50.0% 4cqw, 57.1% 0cqw, 64.3% 4cqw, 71.4% 0cqw, 78.6% 4cqw, 85.7% 0cqw, 92.9% 4cqw, 100.0% 0cqw, 100.0% calc(100% - 0cqw), 92.9% calc(100% - 4cqw), 85.7% calc(100% - 0cqw), 78.6% calc(100% - 4cqw), 71.4% calc(100% - 0cqw), 64.3% calc(100% - 4cqw), 57.1% calc(100% - 0cqw), 50.0% calc(100% - 4cqw), 42.9% calc(100% - 0cqw), 35.7% calc(100% - 4cqw), 28.6% calc(100% - 0cqw), 21.4% calc(100% - 4cqw), 14.3% calc(100% - 0cqw), 7.1% calc(100% - 4cqw), 0.0% calc(100% - 0cqw));
+}
+.sc-receipt::before { content: "* * * * * * * *"; display: block; text-align: center; font: 400 8cqw/1 var(--type); color: var(--pencil); margin-bottom: 6cqw; }
+.sc-receipt .sctext { font: 400 9.5cqw/1.45 var(--type); }
+
+.sc-stamp {
+  aspect-ratio: .82; padding: 9cqw; background: #FBFAF5;
+  -webkit-mask: radial-gradient(circle 4.6cqw, transparent 96%, #000) -6cqw -6cqw / 12cqw 12cqw, linear-gradient(#000 0 0) content-box;
+  mask: radial-gradient(circle 4.6cqw, transparent 96%, #000) -6cqw -6cqw / 12cqw 12cqw, linear-gradient(#000 0 0) content-box;
+}
+.sc-stamp .sctext {
+  height: 100%; display: grid; place-items: center; text-align: center; padding: 6cqw;
+  background: linear-gradient(160deg, #B9452E, #8E3324); color: #F7F1E6; font: 400 15cqw/1.1 var(--hand);
+}
+.sc-stamp .sctext:empty::before { content: "✿"; opacity: .9; font-size: 26cqw; }
+
+.sc-note {
+  min-height: 70cqw; padding: 8cqw 8cqw 12cqw 16cqw; background-color: #FBFAF5;
+  background-image: linear-gradient(90deg, transparent 12cqw, rgba(205,90,80,.55) 12cqw, rgba(205,90,80,.55) 12.6cqw, transparent 12.6cqw),
+                    repeating-linear-gradient(transparent 0 10.4cqw, rgba(80,110,150,.3) 10.4cqw 11cqw);
+  background-position: 0 0, 0 7.4cqw;
+  clip-path: polygon(0 0, 100% 0, 100.0% calc(100% - 3.7cqw), 94.4% calc(100% - 4.5cqw), 88.9% calc(100% - 4.8cqw), 83.3% calc(100% - 5.7cqw), 77.8% calc(100% - 4.4cqw), 72.2% calc(100% - 5.5cqw), 66.7% calc(100% - 0.2cqw), 61.1% calc(100% - 2.8cqw), 55.6% calc(100% - 5.7cqw), 50.0% calc(100% - 3.9cqw), 44.4% calc(100% - 5.4cqw), 38.9% calc(100% - 0.7cqw), 33.3% calc(100% - 2.8cqw), 27.8% calc(100% - 1.5cqw), 22.2% calc(100% - 3.3cqw), 16.7% calc(100% - 3.4cqw), 11.1% calc(100% - 0.1cqw), 5.6% calc(100% - 1.3cqw), 0.0% calc(100% - 1.7cqw));
+}
+.sc-note .sctext { font: 400 9cqw/11cqw var(--hand); }
+
+.sc-label {
+  display: inline-block; padding: 2.5cqw 6cqw 2cqw; background: #1F1E1B; color: #F2F0E8;
+  font: 700 9cqw/1.2 "Courier New", monospace; letter-spacing: .14em; text-transform: uppercase;
+  text-shadow: 0 -1px 0 rgba(0,0,0,.6), 0 1px 0 rgba(255,255,255,.12); border-radius: 1cqw;
+}
+.sc-label .sctext { min-width: 30cqw; }
+
+.sc-clip svg { display: block; width: 100%; height: auto; filter: drop-shadow(0 2px 2px rgba(30,30,25,.3)); }
+.scrap.sc-clip { filter: none; }
+
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 /* one moment of motion: a new print develops */

@@ -1,4 +1,4 @@
-export const VERSION = "49"; // bump on every change; shown at the bottom of Archive
+export const VERSION = "50"; // bump on every change; shown at the bottom of Archive
 // diary — app code. Loaded (and hot-swapped) by index.html.
 // mount(root, state) draws the app and returns an unmount function.
 
@@ -181,6 +181,11 @@ const cutChar = (ch, i) => {
   if (c >= "a" && c <= "z") return `<img class="cut" src="cutout/${c}.webp" alt="${esc(ch)}" draggable="false" style="--r:${r}deg;--y:${y}em">`;
   return `<span class="cut cut-scrap" style="--r:${r}deg;--y:${y}em">${esc(ch)}</span>`;
 };
+// paper scraps for Decorate: [type, label]
+const SCRAPS = [["ticket", "Ticket"], ["receipt", "Receipt"], ["stamp", "Stamp"], ["note", "Note"], ["label", "Label"], ["clip", "Clip"]];
+const SCRAP_SIZE = { ticket: .36, receipt: .24, stamp: .17, note: .32, label: .3, clip: .07 };
+const SCRAP_HINT = { ticket: "ADMIT ONE", receipt: "write here", stamp: "", note: "write here", label: "label" };
+const CLIP_SVG = `<svg viewBox="0 0 20 60" aria-hidden="true" fill="none" stroke="#8E918A" stroke-width="2.2" stroke-linecap="round"><path d="M14 18v26a5 5 0 0 1-10 0V10a6.5 6.5 0 0 1 13 0v34"/><path d="M7.5 16v26a2.5 2.5 0 0 0 5 0V18" opacity=".9"/></svg>`;
 const ROTATE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18.5 9.5a7 7 0 1 0 .8 5.6"/><path d="M19 4.5v5h-5"/></svg>`;
 
 // ---------- backup bookkeeping ----------
@@ -449,7 +454,7 @@ export async function mount(root, state) {
     root.innerHTML = `
       <div class="wrap${editing ? " decorating" : ""}">
         <header class="top">
-          <a class="wordmark cutmark" href="#/" aria-label="Diary">${cutHTML("Diary")}</a>
+          <a class="wordmark bigmark" href="#/">Diary</a>
           <a class="navtag" href="#/archive">Archive</a>
         </header>
         <div class="dayhead">
@@ -559,6 +564,9 @@ export async function mount(root, state) {
     } else if (i.kind === "text") {
       const cls = ["ctext", `f-${i.font || "hand"}`, i.hl ? "hl" : "", i.tape ? "taped" : ""].join(" ");
       inner = `<div class="ctextbox" style="font-size:calc(var(--bw) * ${i.fs})"><span class="${cls}" style="${textStyle(i)}" spellcheck="false">${i.font === "cut" ? cutHTML(i.text) : esc(i.text)}</span></div>`;
+    } else if (i.kind === "scrap") {
+      inner = i.type === "clip" ? `<span class="scrap sc-clip">${CLIP_SVG}</span>`
+        : `<div class="scrap sc-${i.type}"><span class="sctext" spellcheck="false" data-ph="${esc(SCRAP_HINT[i.type] || "")}">${esc(i.text || "")}</span></div>`;
     } else if (i.kind === "tape") {
       inner = `<span class="ctape"></span>`;
     } else if (i.kind === "image") {
@@ -726,6 +734,13 @@ export async function mount(root, state) {
     const bw = boardEl.clientWidth, top = boardEl.getBoundingClientRect().top;
     return clamp((innerHeight * .35 - top) / bw, .03, Math.max(.03, boardEl.clientHeight / bw - .2)) + step5() * .045;
   }
+  function addScrap(type) {
+    checkpoint();
+    const it = { id: newId(), kind: "scrap", type, text: type === "ticket" ? "ADMIT ONE" : "", x: .3 + step5() * .05, y: dropY(), w: SCRAP_SIZE[type], rot: Math.round(Math.random() * 10 - 5), z: topZ() + 1 };
+    col.items.push(it);
+    boardEl.insertAdjacentHTML("beforeend", itemHTML(it));
+    select(it.id); fitBoard(); saveCollage();
+  }
   function addItem(kind) {
     checkpoint();
     const base = { id: newId(), kind, rot: Math.round(Math.random() * 8 - 4), z: topZ() + 1, y: dropY() };
@@ -776,7 +791,7 @@ export async function mount(root, state) {
 
   function startTextEdit(el, it) {
     if (it.text) checkpoint(); // new text boxes already saved a step when added
-    const t = el.querySelector(".ctext");
+    const t = el.querySelector(".ctext, .sctext"); if (!t) return;
     if (it.font === "cut") t.textContent = it.text; // type plain letters, they turn into cut-outs when you leave
     t.contentEditable = "true"; t.focus();
     const r = document.createRange(); r.selectNodeContents(t); r.collapse(false);
@@ -784,7 +799,7 @@ export async function mount(root, state) {
     t.oninput = () => { it.text = t.innerText.replace(/\n$/, ""); fitBoard(); saveCollage(); };
     t.onblur = () => {
       t.contentEditable = "false";
-      if (!it.text.trim() && col.items.includes(it)) return removeItem(it.id);
+      if (it.kind === "text" && !it.text.trim() && col.items.includes(it)) return removeItem(it.id);
       if (it.font === "cut") { t.innerHTML = cutHTML(it.text); fitBoard(); }
     };
   }
@@ -794,8 +809,8 @@ export async function mount(root, state) {
     const el = e.target.closest(".ci");
     if (e.target.closest(".h-del")) { e.preventDefault(); removeItem(el.dataset.id); return; }
     if (!el || el.classList.contains("ci-add")) { if (document.activeElement?.isContentEditable) document.activeElement.blur(); select(null); return; }
-    const t = el.querySelector(".ctext");
-    if (t && t.isContentEditable && e.target.closest(".ctext")) return; // typing
+    const t = el.querySelector(".ctext, .sctext");
+    if (t && t.isContentEditable && e.target.closest(".ctext, .sctext")) return; // typing
     e.preventDefault();
     if (document.activeElement?.isContentEditable) document.activeElement.blur();
     const it = col.items.find(i => i.id === el.dataset.id);
@@ -833,7 +848,7 @@ export async function mount(root, state) {
   function onUp() {
     if (!drag) return;
     const d = drag; drag = null;
-    if (d.mode === "m" && !d.moved && d.wasSel && d.it.kind === "text") startTextEdit(d.el, d.it);
+    if (d.mode === "m" && !d.moved && d.wasSel && (d.it.kind === "text" || (d.it.kind === "scrap" && d.it.type !== "clip"))) startTextEdit(d.el, d.it);
     fitBoard(); saveCollage();
   }
 
@@ -843,10 +858,11 @@ export async function mount(root, state) {
     const bar = root.querySelector(".decobar"); if (!bar) return;
     const it = col?.items.find(i => i.id === selectedId);
     const kind = it?.kind || "none";
-    const tabsFor = { none: [["add", "Add"], ["page", "Page"]], text: [["style", "Style"], ["color", "Color"], ["marker", "Marker"]], photo: [["frame", "Frame"], ["look", "Look"]], image: [], tape: [] }[kind];
+    const tabsFor = { none: [["add", "Add"], ["scraps", "Scraps"], ["page", "Page"]], text: [["style", "Style"], ["color", "Color"], ["marker", "Marker"]], photo: [["frame", "Frame"], ["look", "Look"]], image: [], tape: [], scrap: [] }[kind];
     if (kind !== decoKind) { decoKind = kind; decoTab = tabsFor[0]?.[0] || null; }
     const b = (attrs, label, pressed) => `<button ${attrs}${pressed != null ? ` aria-pressed="${!!pressed}"` : ""}>${label}</button>`;
     const opt = {
+      scraps: () => SCRAPS.map(([k, n]) => b(`data-scrap="${k}"`, n)).join(""),
       add: () => `${b('data-deco="text"', "Text")}${b('data-deco="tape" aria-label="Tape" title="Tape"', `<span class="tape-swatch"></span>`)}${b('data-deco="photo"', "Photo")}${b('data-deco="paste"', "Paste")}${b('data-deco="commons"', "Wikimedia")}`,
       page: () => `<span class="group">${[["card", "Card"], ["kraft", "Kraft"], ["grid", "Grid"], ["album", "Album"]].map(([f, n]) => b(`data-paper="${f}" class="paper-btn pb-${f}"`, n, curPaper() === f)).join("")}</span>
         <span class="group">${[["neat", "Neat"], ["loose", "Loose"]].map(([f, n]) => b(`data-look="${f}"`, n, lookNow() === f)).join("")}</span>${b('data-deco="tidy"', "Tidy up")}`,
@@ -1095,7 +1111,7 @@ export async function mount(root, state) {
     root.innerHTML = `
       <div class="wrap">
         <header class="top">
-          <a class="wordmark cutmark" href="#/" aria-label="Diary">${cutHTML("Diary")}</a>
+          <a class="wordmark bigmark" href="#/">Diary</a>
           <a class="navtag" href="#/">Today</a>
         </header>
         <h1 class="page-title day-title big-date archive-title">Archive</h1>
@@ -1255,7 +1271,7 @@ export async function mount(root, state) {
 
   // ---------- events (all removed on unmount) ----------
   on(document, "click", async e => {
-    const t = e.target.closest("[data-camera],[data-library],[data-open],[data-close],[data-step],[data-delete],[data-export],[data-import],[data-folder],[data-resume],[data-stopfolder],[data-importfolder],[data-font],[data-decorate],[data-deco],[data-tx],[data-sheet-close],[data-pick],[data-ph],[data-paper],[data-nav],[data-look],[data-dtab],[data-layer],[data-signin],[data-signout],[data-syncnow],[data-saveimg]");
+    const t = e.target.closest("[data-camera],[data-library],[data-open],[data-close],[data-step],[data-delete],[data-export],[data-import],[data-folder],[data-resume],[data-stopfolder],[data-importfolder],[data-font],[data-decorate],[data-deco],[data-tx],[data-sheet-close],[data-pick],[data-ph],[data-paper],[data-nav],[data-look],[data-dtab],[data-layer],[data-scrap],[data-signin],[data-signout],[data-syncnow],[data-saveimg]");
     if (!t) {
       if (viewerEl && e.target.classList?.contains("stage")) closeViewer();
       if (sheetEl && e.target === sheetEl) closeCommons();
@@ -1282,6 +1298,7 @@ export async function mount(root, state) {
     else if (t.dataset.tx) textAction(t);
     else if (t.dataset.ph) photoAction(t);
     else if (t.dataset.layer) layerAction(t.dataset.layer);
+    else if (t.dataset.scrap) addScrap(t.dataset.scrap);
     else if (has("data-signin")) { try { await cloud?.signIn(); } catch (err) { alert("Sign-in didn’t work. Check your connection and try again."); console.error(err); } }
     else if (has("data-signout")) { await cloud?.signOut(); }
     else if (has("data-syncnow")) cloud?.sync();
