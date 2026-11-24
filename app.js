@@ -1,4 +1,4 @@
-export const VERSION = "32"; // bump on every change; shown at the bottom of Archive
+export const VERSION = "33"; // bump on every change; shown at the bottom of Archive
 // diary — app code. Loaded (and hot-swapped) by index.html.
 // mount(root, state) draws the app and returns an unmount function.
 
@@ -167,8 +167,20 @@ const LAYER_ICONS = (() => {
     back: svg(`${sq(4, false)}${sq(9, false)}${sq(14, true)}`),
   };
 })();
-const UNDO_ICON = `<span class="glyph" aria-hidden="true">↶</span>`;
-const REDO_ICON = `<span class="glyph" aria-hidden="true">↷</span>`;
+const UNDO_ICON = `<span class="glyph" aria-hidden="true">←</span>`;
+const REDO_ICON = `<span class="glyph" aria-hidden="true">→</span>`;
+// letters cut from magazines: one picture per letter in /cutout; anything else becomes a little paper scrap
+const CUT_TILT = [-4, 3, -2, 5, -3, 2, -5, 4];
+const cutHTML = text => { let i = 0; return String(text).split(/(\n| )/).map(part => {
+  if (part === "\n") return "<br>";
+  if (part === " ") { i++; return '<span class="cut-sp"> </span>'; }
+  return `<span class="cutword">${[...part].map(ch => cutChar(ch, i++)).join("")}</span>`; // a word never breaks across lines
+}).join(""); };
+const cutChar = (ch, i) => {
+  const c = ch.toLowerCase(), r = CUT_TILT[i % CUT_TILT.length], y = ((i * 37) % 7 - 3) * .02;
+  if (c >= "a" && c <= "z") return `<img class="cut" src="cutout/${c}.webp" alt="${esc(ch)}" draggable="false" style="--r:${r}deg;--y:${y}em">`;
+  return `<span class="cut cut-scrap" style="--r:${r}deg;--y:${y}em">${esc(ch)}</span>`;
+};
 const ROTATE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18.5 9.5a7 7 0 1 0 .8 5.6"/><path d="M19 4.5v5h-5"/></svg>`;
 
 // ---------- backup bookkeeping ----------
@@ -437,7 +449,7 @@ export async function mount(root, state) {
     root.innerHTML = `
       <div class="wrap${editing ? " decorating" : ""}">
         <header class="top">
-          <a class="wordmark" href="#/">Diary</a>
+          <a class="wordmark cutmark" href="#/" aria-label="Diary">${cutHTML("Diary")}</a>
           <a class="navtag" href="#/archive">Archive</a>
         </header>
         <div class="dayhead">
@@ -541,7 +553,7 @@ export async function mount(root, state) {
            <div class="cap">${time}<label class="sr" for="cap-${p.id}">Note for this photo</label><textarea class="caption" id="cap-${p.id}" data-cap="${p.id}" rows="1" placeholder="write about this one">${esc(p.caption)}</textarea></div>`);
     } else if (i.kind === "text") {
       const cls = ["ctext", `f-${i.font || "hand"}`, i.hl ? "hl" : "", i.tape ? "taped" : ""].join(" ");
-      inner = `<div class="ctextbox" style="font-size:calc(var(--bw) * ${i.fs})"><span class="${cls}" style="${textStyle(i)}" spellcheck="false">${esc(i.text)}</span></div>`;
+      inner = `<div class="ctextbox" style="font-size:calc(var(--bw) * ${i.fs})"><span class="${cls}" style="${textStyle(i)}" spellcheck="false">${i.font === "cut" ? cutHTML(i.text) : esc(i.text)}</span></div>`;
     } else if (i.kind === "tape") {
       inner = `<span class="ctape"></span>`;
     } else if (i.kind === "image") {
@@ -759,6 +771,7 @@ export async function mount(root, state) {
   function startTextEdit(el, it) {
     if (it.text) checkpoint(); // new text boxes already saved a step when added
     const t = el.querySelector(".ctext");
+    if (it.font === "cut") t.textContent = it.text; // type plain letters, they turn into cut-outs when you leave
     t.contentEditable = "true"; t.focus();
     const r = document.createRange(); r.selectNodeContents(t); r.collapse(false);
     const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
@@ -766,6 +779,7 @@ export async function mount(root, state) {
     t.onblur = () => {
       t.contentEditable = "false";
       if (!it.text.trim() && col.items.includes(it)) return removeItem(it.id);
+      if (it.font === "cut") { t.innerHTML = cutHTML(it.text); fitBoard(); }
     };
   }
 
@@ -830,8 +844,8 @@ export async function mount(root, state) {
       add: () => `${b('data-deco="text"', "Text")}${b('data-deco="tape" aria-label="Tape" title="Tape"', `<span class="tape-swatch"></span>`)}${b('data-deco="photo"', "Photo")}${b('data-deco="paste"', "Paste")}${b('data-deco="commons"', "Wikimedia")}`,
       page: () => `<span class="group">${[["card", "Card"], ["kraft", "Kraft"], ["grid", "Grid"], ["album", "Album"]].map(([f, n]) => b(`data-paper="${f}" class="paper-btn pb-${f}"`, n, curPaper() === f)).join("")}</span>
         <span class="group">${[["neat", "Neat"], ["loose", "Loose"]].map(([f, n]) => b(`data-look="${f}"`, n, lookNow() === f)).join("")}</span>${b('data-deco="tidy"', "Tidy up")}`,
-      style: () => `<span class="group">${[["hand", "Hand"], ["type", "Type"], ["press", "Press"]].map(([f, n]) => b(`data-tx="font" data-v="${f}" class="f-${f}"`, n, (it.font || "hand") === f)).join("")}</span>
-        ${b('data-tx="bold" class="bold"', "B", it.bold)}${b('data-tx="tape" aria-label="Tape behind text"', `<span class="tape-swatch"></span>`, it.tape)}`,
+      style: () => `<span class="group">${[["hand", "Hand"], ["type", "Type"], ["press", "Press"], ["cut", "Cutout"]].map(([f, n]) => b(`data-tx="font" data-v="${f}" class="f-${f}"`, n, (it.font || "hand") === f)).join("")}</span>
+        ${b('data-tx="tape" aria-label="Tape behind text"', `<span class="tape-swatch"></span>`, it.tape)}`,
       color: () => COLORS.map(c => b(`data-tx="color" data-v="${c}" class="dot" style="--c:${c}" aria-label="Color ${c}"`, "", (it.color || COLORS[0]) === c)).join(""),
       marker: () => b('data-tx="hl" data-v="" class="hl-none" aria-label="No highlighter"', "", !it.hl) + HILITES.map(c => b(`data-tx="hl" data-v="${c}" class="hl-dot" style="--c:${c}" aria-label="Highlighter ${c}"`, "", it.hl === c)).join(""),
       frame: () => [["print", "Print"], ["instant", "Instant"], ["film", "Film"], ["torn", "Torn"]].map(([f, n]) => b(`data-ph="frame" data-v="${f}"`, n, (it.frame || "print") === f)).join(""),
@@ -1046,7 +1060,7 @@ export async function mount(root, state) {
     root.innerHTML = `
       <div class="wrap">
         <header class="top">
-          <a class="wordmark" href="#/">Diary</a>
+          <a class="wordmark cutmark" href="#/" aria-label="Diary">${cutHTML("Diary")}</a>
           <a class="navtag" href="#/">Today</a>
         </header>
         <h1 class="page-title day-title">Archive</h1>

@@ -507,6 +507,20 @@ html, body { overflow-x: clip; }
 .account .chip { text-decoration: none; }
 a.chip { text-decoration: none; display: inline-block; }
 
+
+/* cut-out magazine letters: the title, and the Cutout text style */
+.wordmark.cutmark { display: inline-flex; align-items: center; gap: .04em; font-size: 30px; -webkit-text-stroke: 0; }
+img.cut, .cut-scrap {
+  display: inline-block; height: 1.15em; width: auto; vertical-align: middle; margin: 0 .015em;
+  transform: translateY(var(--y, 0)) rotate(var(--r, 0deg));
+  filter: drop-shadow(0 1px 1px rgba(30,30,25,.28));
+}
+.cut-scrap { height: auto; padding: .08em .2em .02em; background: #ECE9E0; color: #1F1E1B; font: 700 .85em/1.1 Georgia, serif; }
+.cut-sp { display: inline-block; width: .32em; }
+.cutword { white-space: nowrap; }
+.ctext.f-cut { font-family: var(--type); line-height: 1.35; }
+.decobar button.f-cut { font-family: Georgia, serif; font-weight: 700; letter-spacing: .02em; }
+
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 /* one moment of motion: a new print develops */
