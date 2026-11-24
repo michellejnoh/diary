@@ -1,4 +1,4 @@
-export const VERSION = "48"; // bump on every change; shown at the bottom of Archive
+export const VERSION = "49"; // bump on every change; shown at the bottom of Archive
 // diary — app code. Loaded (and hot-swapped) by index.html.
 // mount(root, state) draws the app and returns an unmount function.
 
@@ -493,7 +493,7 @@ export async function mount(root, state) {
   // grid slots, in board-width units
   function grid() {
     const bw = boardEl.clientWidth || 360;
-    const cols = bw < 560 ? 2 : bw < 900 ? 3 : 4, gap = bw < 560 ? .05 : .035;
+    const cols = 3, gap = bw < 560 ? .04 : .035; // three photos per row on every screen
     const capH = 92 / bw;
     if (lookNow() !== "loose") {
       const w = (1 - gap * (cols - 1) - .02) / cols;

@@ -168,7 +168,8 @@ export async function renderDay(opt) {
     const spread = Math.sqrt(hs.reduce((a, h) => a + (h - mean) ** 2, 0) / hs.length) / mean; // 0 = all rows the same height
     const filled = (hs.reduce((a, b) => a + b, 0) + gap * (rows.length - 1)) / AH;           // 1 = fills the screen
     const widthUsed = rows.reduce((a, r) => a + Math.min(1, (r.h * f * r.sumA + gap * (r.items.length - 1)) / AW), 0) / rows.length;
-    const score = filled * widthUsed - .45 * spread;
+    const threes = sp.filter(k => k === 3).length / sp.length; // rows of three are the default look
+    const score = filled * widthUsed - .45 * spread + .25 * threes;
     if (!plan || score > plan.score) plan = { rows, f, score };
   }
   const { rows, f } = plan;
