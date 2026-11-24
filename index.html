@@ -11,7 +11,7 @@
 <link rel="manifest" href="manifest.json">
 <link rel="icon" href="icon.png">
 <link rel="apple-touch-icon" href="icon.png">
-<link rel="stylesheet" id="appcss" href="style.css">
+<link rel="stylesheet" id="appcss" href="style.css?v=7">
 </head>
 <body>
 <div id="app"></div>
@@ -43,7 +43,8 @@ function swapCSS() {
   const link = document.createElement("link");
   link.rel = "stylesheet";
   link.href = `style.css?v=${Date.now()}`;
-  link.onload = () => { old.remove(); link.id = "appcss"; };
+  const done = () => { document.querySelectorAll('link[rel="stylesheet"]').forEach(l => l !== link && l.remove()); link.id = "appcss"; };
+  link.onload = done; link.onerror = done;
   old.after(link);
 }
 
@@ -51,14 +52,15 @@ async function check() {
   const [js, css] = await Promise.all([signature("app.js"), signature("style.css")]);
   if (css && sigs.css && css !== sigs.css) swapCSS();
   if (js && sigs.js && js !== sigs.js) {
-    try { await loadApp(); } catch (e) { console.error("Update failed", e); }
+    try { await loadApp(); }
+    catch (e) { console.error("Live update failed, reloading once", e); location.reload(); return; }
   }
   if (css) sigs.css = css;
   if (js) sigs.js = js;
 }
 window.__diaryCheck = check;
 
-await loadApp();
+try { await loadApp(); } catch (e) { console.error(e); root.textContent = "diary couldn’t start. Reload the page."; }
 check();
 setInterval(() => { if (document.visibilityState === "visible") check(); }, 30000);
 document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") check(); });

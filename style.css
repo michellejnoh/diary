@@ -1,15 +1,15 @@
 /* All fonts live in /fonts. Korean files hold every Hangul syllable, so typing never flashes another font.
    size-adjust makes every font look the same size, so Korean and English sit evenly on one line. */
-@font-face { font-family: "Nanum Pen Script"; src: url("fonts/nanumpenscript.woff2") format("woff2"); size-adjust: 128%; font-display: swap; }
-@font-face { font-family: "Gaegu"; src: url("fonts/gaegu.woff2") format("woff2"); size-adjust: 108%; font-display: swap; }
-@font-face { font-family: "Poor Story"; src: url("fonts/poorstory.woff2") format("woff2"); size-adjust: 104%; font-display: swap; }
-@font-face { font-family: "Gowun Batang"; src: url("fonts/gowunbatang.woff2") format("woff2"); size-adjust: 86%; font-display: swap; }
-@font-face { font-family: "Caveat"; src: url("fonts/caveat.woff2") format("woff2"); size-adjust: 118%; font-display: swap; unicode-range: U+0000-00FF, U+2010-205E, U+20AC; }
-@font-face { font-family: "Patrick Hand"; src: url("fonts/patrickhand.woff2") format("woff2"); size-adjust: 100%; font-display: swap; unicode-range: U+0000-00FF, U+2010-205E, U+20AC; }
-@font-face { font-family: "Indie Flower"; src: url("fonts/indieflower.woff2") format("woff2"); size-adjust: 92%; font-display: swap; unicode-range: U+0000-00FF, U+2010-205E, U+20AC; }
-@font-face { font-family: "EB Garamond"; src: url("fonts/ebgaramond.woff2") format("woff2"); size-adjust: 100%; font-display: swap; unicode-range: U+0000-00FF, U+2010-205E, U+20AC; }
-@font-face { font-family: "IM Fell English"; src: url("fonts/imfell.woff2") format("woff2"); font-display: swap; }
-@font-face { font-family: "Special Elite"; src: url("fonts/specialelite.woff2") format("woff2"); font-display: swap; }
+@font-face { font-family: "Nanum Pen Script"; src: url("fonts/nanumpenscript.woff2?v=7") format("woff2"); size-adjust: 128%; font-display: swap; }
+@font-face { font-family: "Gaegu"; src: url("fonts/gaegu.woff2?v=7") format("woff2"); size-adjust: 108%; font-display: swap; }
+@font-face { font-family: "Poor Story"; src: url("fonts/poorstory.woff2?v=7") format("woff2"); size-adjust: 104%; font-display: swap; }
+@font-face { font-family: "Gowun Batang"; src: url("fonts/gowunbatang.woff2?v=7") format("woff2"); size-adjust: 86%; font-display: swap; }
+@font-face { font-family: "Caveat"; src: url("fonts/caveat.woff2?v=7") format("woff2"); size-adjust: 118%; font-display: swap; unicode-range: U+0000-00FF, U+2010-205E, U+20AC; }
+@font-face { font-family: "Patrick Hand"; src: url("fonts/patrickhand.woff2?v=7") format("woff2"); size-adjust: 100%; font-display: swap; unicode-range: U+0000-00FF, U+2010-205E, U+20AC; }
+@font-face { font-family: "Indie Flower"; src: url("fonts/indieflower.woff2?v=7") format("woff2"); size-adjust: 92%; font-display: swap; unicode-range: U+0000-00FF, U+2010-205E, U+20AC; }
+@font-face { font-family: "EB Garamond"; src: url("fonts/ebgaramond.woff2?v=7") format("woff2"); size-adjust: 100%; font-display: swap; unicode-range: U+0000-00FF, U+2010-205E, U+20AC; }
+@font-face { font-family: "IM Fell English"; src: url("fonts/imfell.woff2?v=7") format("woff2"); font-display: swap; }
+@font-face { font-family: "Special Elite"; src: url("fonts/specialelite.woff2?v=7") format("woff2"); font-display: swap; }
 
 :root {
   --card: #D5D7CE;      /* grey album card */
@@ -24,7 +24,7 @@
   --press: "IM Fell English", Georgia, serif;                 /* letterpress: titles */
   /* worn ink: speckles where the type didn't take ink */
   --ink-wear: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='w'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.7' numOctaves='2' seed='4'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -2.6 2.15'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23w)'/%3E%3C/svg%3E");
-  --ink-wear-fine: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='w'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.4' numOctaves='1' seed='9'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -2.2 2.0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23w)'/%3E%3C/svg%3E");
+  --ink-wear-fine: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='w'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.4' numOctaves='1' seed='9'/%3E%3CfeColorMatrix values='0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 -2.8 2.25'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23w)'/%3E%3C/svg%3E");
   --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .17 0 0 0 0 .17 0 0 0 0 .15 0 0 0 .55 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   --mottle: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='600' height='600'%3E%3Cfilter id='m'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.012' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .25 0 0 0 0 .25 0 0 0 0 .22 0 0 0 .22 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23m)'/%3E%3C/svg%3E");
 }
@@ -45,7 +45,7 @@ button { cursor: pointer; }
 a { color: inherit; }
 /* typewriter: uneven ink on small type */
 .typed, .link, .time, .summary, .nudge, .weekdays, .cell .n, .add-tile span, .keep, .fonts summary, .font-opt .name, .viewer .pager span {
-  text-shadow: 0 0 .5px currentColor, .3px .2px 0 rgba(44,43,39,.18);
+  text-shadow: 0 0 .7px currentColor, .4px .3px 0 rgba(44,43,39,.28), -.2px 0 .3px rgba(44,43,39,.18);
   -webkit-mask-image: var(--ink-wear-fine); mask-image: var(--ink-wear-fine); -webkit-mask-size: 120px; mask-size: 120px;
 }
 :focus-visible { outline: 2px dashed var(--ink); outline-offset: 3px; }
@@ -218,6 +218,7 @@ header.top { display: flex; align-items: baseline; justify-content: space-betwee
 }
 .viewer .pager button:disabled { opacity: .25; cursor: default; }
 
+.version { margin-top: 40px; font-size: 12px; color: var(--pencil); opacity: .7; }
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 /* one moment of motion: a new print develops */

@@ -1,3 +1,4 @@
+export const VERSION = "7"; // bump on every change; shown at the bottom of Archive
 // diary — app code. Loaded (and hot-swapped) by index.html.
 // mount(root, state) draws the app and returns an unmount function.
 
@@ -169,6 +170,7 @@ const fontsNow = () => ({
 });
 function applyHand() {
   const { ko, en } = fontsNow();
+  delete document.documentElement.dataset.hand; // left over from older versions
   document.documentElement.style.setProperty("--hand", `"${en.family}", "${ko.family}", "Apple SD Gothic Neo", sans-serif`);
   document.fonts?.load(`20px "${ko.family}"`, "가"); // fetch the whole Korean font now, not mid-typing
   document.fonts?.load(`20px "${en.family}"`, "a");
@@ -434,6 +436,7 @@ export async function mount(root, state) {
             ${canFolder ? `<button class="link" data-importfolder>Restore from folder</button>` : ""}
           </div>
         </div>
+        <p class="version typed">version ${VERSION}</p>
       </div>`;
     window.scrollTo(0, state.scroll?.[location.hash] || 0);
   }
