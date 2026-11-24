@@ -284,9 +284,11 @@ html, body { overflow-x: clip; }
 .ci-photo .tape { top: -3.5cqw; height: 8cqw; }
 .ccap { margin: 3cqw 2cqw 0; font: 400 clamp(16px, 8.5cqw, 26px)/1.2 var(--hand); color: var(--ink); white-space: pre-wrap; }
 .ci-photo .frame { width: 100%; border: 0; }
-.ci-photo .cap { padding: 2.5cqw 2cqw 0; }
+.ci-photo .cap { padding: 1.6cqw 2cqw 0; }
+.ci-photo .cap .time { display: block; margin: 0 0 1px; line-height: 1.15; }
 /* in Decorate the note shows as plain text but takes the same room as the text box, so spacing matches */
-.ci-photo .cap .ccap { margin: 0; font-size: clamp(16px, 8.5cqw, 26px); line-height: 1.15; min-height: 1.2em; }
+.ci-photo .cap .ccap { margin: 0; font-size: clamp(16px, 8.5cqw, 26px); line-height: 1.15; min-height: 1.15em; }
+.ci-photo .cap .caption { line-height: 1.15; min-height: 1.15em; }
 .ci-photo .cap .ccap.empty { color: var(--pencil); opacity: .55; }
 .ci-photo .caption { font-size: clamp(16px, 8.5cqw, 26px); }
 .ci-photo .time { margin-bottom: 1px; }
@@ -363,8 +365,9 @@ html, body { overflow-x: clip; }
 .decobar .hl-none::after { content: ""; width: 18px; height: 2px; background: var(--pencil); transform: rotate(-35deg); }
 .decobar .tape-swatch { display: block; width: 30px; height: 10px; background: var(--tape); background-image: var(--grain); transform: rotate(-6deg); box-shadow: 0 0 0 .5px rgba(44,43,39,.15); }
 .deco-end { flex: none; display: flex; gap: 6px; align-items: center; }
-.decobar .icon { min-width: 40px; width: 40px; padding: 0; }
-.decobar .icon .glyph { font: 400 22px/1 -apple-system, system-ui, "Segoe UI Symbol", sans-serif; color: var(--ink); }
+.decobar .icon { min-width: 30px; width: 30px; padding: 0; border: 0; background: none; box-shadow: none; }
+.decobar .icon .glyph { font: 400 20px/1 -apple-system, system-ui, "Segoe UI Symbol", sans-serif; color: var(--ink); }
+.deco-end .icon + .icon { margin-left: -4px; }
 .decobar button:disabled { opacity: .35; cursor: default; }
 .decobar .cancel { padding: 0 10px; }
 .decobar .cancel.danger-armed { color: #A3341B; border-color: #A3341B; }
