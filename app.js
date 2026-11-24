@@ -1,4 +1,4 @@
-export const VERSION = "23"; // bump on every change; shown at the bottom of Archive
+export const VERSION = "24"; // bump on every change; shown at the bottom of Archive
 // diary — app code. Loaded (and hot-swapped) by index.html.
 // mount(root, state) draws the app and returns an unmount function.
 
@@ -487,7 +487,7 @@ export async function mount(root, state) {
     if (lookNow() !== "loose") {
       const w = (1 - gap * (cols - 1) - .02) / cols;
       const rowH = w * 1.34 + capH;
-      return n => ({ x: .01 + (n % cols) * (w + gap), y: .035 + Math.floor(n / cols) * rowH, w, rot: TILTS[n % 4] });
+      return n => ({ x: .01 + (n % cols) * (w + gap), y: .035 + Math.floor(n / cols) * rowH, w, rot: TILTS[n % 4], row: Math.floor(n / cols), drop: 0 });
     }
     // loose: each row gets mixed sizes, uneven gaps, small drops and turns; rows nest into each other a little
     const rows = [];
@@ -508,15 +508,17 @@ export async function mount(root, state) {
     };
     return n => {
       const R = row(Math.floor(n / cols)), c = n % cols;
-      return { x: R.xs[c], y: R.top + R.drops[c], w: R.ws[c], rot: (rnd(n, 5) - .5) * 6.5 };
+      return { x: R.xs[c], y: R.top + R.drops[c], w: R.ws[c], rot: (rnd(n, 5) - .5) * 6.5, row: Math.floor(n / cols), drop: R.drops[c] };
     };
   }
+  const rowOf = new Map(); // auto-placed photo -> [row, drop], for spacing rows by their real height
   function layoutAuto() {
+    rowOf.clear();
     const slot = grid(); let n = 0;
     const order = dayPhotos.map(p => p.id);
     col.items.filter(i => i.kind === "photo" && i.auto)
       .sort((a, b) => order.indexOf(a.ref) - order.indexOf(b.ref))
-      .forEach(i => { Object.assign(i, slot(n)); n++; });
+      .forEach(i => { const sl = slot(n); Object.assign(i, sl); rowOf.set(i.id, [sl.row, sl.drop]); n++; });
     const add = slot(n);
     return lookNow() === "loose" ? { ...add, w: Math.min(add.w, .42), rot: 0 } : add; // where the add tile goes
   }
@@ -552,18 +554,55 @@ export async function mount(root, state) {
     const extra = (i.kind === "image" && i.outline ? " outline" : "") + (i.kind === "photo" ? ` fr-${i.frame || "print"} lk-${i.look || "none"}` : "");
     const seed = [...i.id].reduce((a, ch) => a + ch.charCodeAt(0), 0);
     const vars = i.kind === "photo" ? `;--lift:${(.6 + rnd(seed, 6) * .9).toFixed(2)};--tape-x:${(35 + rnd(seed, 7) * 30).toFixed(0)}%;--tape-r:${((rnd(seed, 8) - .5) * 14).toFixed(1)}deg` : "";
-    return `<div class="ci ci-${i.kind}${extra}${i.id === selectedId ? " sel" : ""}" data-id="${i.id}" style="${pos(i)}${vars}">${inner}${handles}</div>`;
+    const rd = i.auto && rowOf.has(i.id) ? ` data-row="${rowOf.get(i.id)[0]}" data-drop="${rowOf.get(i.id)[1]}"` : "";
+    return `<div class="ci ci-${i.kind}${extra}${i.id === selectedId ? " sel" : ""}" data-id="${i.id}"${rd} style="${pos(i)}${vars}">${inner}${handles}</div>`;
   }
 
   function drawBoard() {
     const addSlot = layoutAuto();
     const add = state.decorating ? "" : `
-      <div class="ci ci-add" style="${pos({ ...addSlot, rot: 0, z: 0 })}">
+      <div class="ci ci-add" data-row="${addSlot.row}" data-drop="${addSlot.drop}" style="${pos({ ...addSlot, rot: 0, z: 0 })}">
         <button class="add-tile" data-camera>${CAMERA}<span>${touch() ? "Take a photo" : "Add photos"}</span></button>
         ${touch() ? `<button class="link small" data-library>or choose from library</button>` : ""}
       </div>`;
     boardEl.innerHTML = col.items.map(itemHTML).join("") + add;
     boardEl.querySelectorAll(".caption").forEach(grow);
+    spaceRows();
+  }
+  // rows sit right under the tallest thing in the row above (photo + its note), not at a fixed guess
+  function spaceRows() {
+    if (!boardEl) return;
+    const bw = boardEl.clientWidth || 1, loose = lookNow() === "loose";
+    const gap = loose ? 6 : 20, els = [...boardEl.querySelectorAll(".ci[data-row]")];
+    const tall = [];
+    els.forEach(el => { const r = +el.dataset.row; tall[r] = Math.max(tall[r] || 0, el.offsetHeight + (+el.dataset.drop || 0) * bw); });
+    const top = []; let y = .035 * bw;
+    for (let r = 0; r < tall.length; r++) { top[r] = y; y += (tall[r] || 0) + gap; }
+    els.forEach(el => {
+      const yy = (top[+el.dataset.row] + (+el.dataset.drop || 0) * bw) / bw;
+      el.style.top = `calc(var(--bw) * ${yy})`;
+      const it = col.items.find(i => i.id === el.dataset.id); if (it) it.y = yy;
+    });
+    // the add button goes to the next free spot: if a moved photo covers its slot, it drops below everything
+    const add = boardEl.querySelector(".ci-add");
+    if (add) {
+      const a = add.getBoundingClientRect();
+      const hit = [...boardEl.querySelectorAll(".ci:not([data-row])")].some(el => {
+        const b = el.getBoundingClientRect();
+        return a.left < b.right - 8 && a.right > b.left + 8 && a.top < b.bottom - 8 && a.bottom > b.top + 8;
+      });
+      if (hit) {
+        // try right after the last photo; if that's taken or off the page, go below everything
+        const boxes = [...boardEl.querySelectorAll(".ci:not(.ci-add)")].map(el => ({ l: el.offsetLeft, t: el.offsetTop, r: el.offsetLeft + el.offsetWidth, b: el.offsetTop + el.offsetHeight }));
+        const w = add.offsetWidth, h = add.offsetHeight;
+        const free = (l, t) => l + w <= bw + 4 && !boxes.some(o => l < o.r - 8 && l + w > o.l + 8 && t < o.b - 8 && t + h > o.t + 8);
+        const lastEl = boardEl.querySelector(`.ci-photo[data-id="${col.items.filter(i => i.kind === "photo").sort((x, y) => dayPhotos.findIndex(p => p.id === x.ref) - dayPhotos.findIndex(p => p.id === y.ref)).pop()?.id}"]`);
+        let spot = null;
+        if (lastEl) { const l = lastEl.offsetLeft + lastEl.offsetWidth + gap, t = lastEl.offsetTop; if (free(l, t)) spot = [l, t]; }
+        if (!spot) spot = [.01 * bw, Math.max(0, ...boxes.map(o => o.b)) + gap + 14];
+        add.style.left = `${spot[0]}px`; add.style.top = `${spot[1]}px`;
+      }
+    }
     fitBoard();
   }
 
@@ -577,6 +616,7 @@ export async function mount(root, state) {
     const have = new Set(items.filter(i => i.kind === "photo").map(i => i.ref));
     let z = Math.max(0, ...items.map(i => i.z || 0));
     for (const p of photos) if (!have.has(p.id)) items.push({ id: newId(), kind: "photo", ref: p.id, auto: true, z: ++z });
+    if (items.some(i => i.kind !== "photo") && items.some(i => i.kind === "photo" && i.auto && i.x != null)) items.forEach(i => { if (i.kind === "photo" && i.x != null) delete i.auto; });
     col = { items };
     paperNow = day.paper || "card";
     assets = preAssets || {};
@@ -1130,7 +1170,12 @@ export async function mount(root, state) {
     else if (t.dataset.step) step(Number(t.dataset.step));
     else if (has("data-export")) exportBackup();
     else if (has("data-import")) { importInput.value = ""; importInput.click(); }
-    else if (has("data-decorate")) { await flushText(); state.decorating = true; selectedId = null; render(); }
+    else if (has("data-decorate")) {
+      await flushText();
+      // lock photos where they are now, so decorations line up the same on phone, iPad and computer
+      if (col?.items.some(i => i.kind === "photo" && i.auto)) { col.items.forEach(i => { if (i.kind === "photo") delete i.auto; }); await saveCollage(true); }
+      state.decorating = true; selectedId = null; render();
+    }
     else if (t.dataset.deco) decoAction(t.dataset.deco, t);
     else if (t.dataset.tx) textAction(t);
     else if (t.dataset.ph) photoAction(t);
@@ -1239,7 +1284,7 @@ export async function mount(root, state) {
   on(document, "input", e => {
     const t = e.target;
     if (t.id === "handTry") { const o = root.querySelector("#handOut"); if (o) o.innerHTML = handHTML(t.value); return; }
-    if (t.matches?.(".caption")) { grow(t); const id = t.dataset.cap, v = t.value; queueText(`cap:${id}`, () => store.setCaption(id, v)); }
+    if (t.matches?.(".caption")) { grow(t); spaceRows(); const id = t.dataset.cap, v = t.value; queueText(`cap:${id}`, () => store.setCaption(id, v)); }
     else if (t.id === "note") { grow(t); const k = route().date, v = t.value; queueText(`note:${k}`, () => store.patchDay(k, { note: v })); }
   });
   on(cameraInput, "change", () => cameraInput.files.length && addFiles([...cameraInput.files]));
