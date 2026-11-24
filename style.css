@@ -548,3 +548,23 @@ header.top { padding-bottom: 12px; }
 .decorating .daysub { padding-left: 0; }
 /* whole top a little lower */
 .wrap { padding-top: 22px; }
+
+/* Decorate and Save image: stacked, at the right end of the date line */
+.daterow { width: 100%; }
+.dayhead { width: auto; }
+.dayactions { margin-left: auto; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.dayactions .link { font: italic 400 14px/1.3 var(--type); color: var(--ink); padding: 0; }
+.dayactions .link:disabled { opacity: .5; }
+.daysub { padding-left: 0; }
+
+/* opened from the home screen: a solid strip behind the clock, so nothing shows blurred under it */
+@media (display-mode: standalone) {
+  body { background-image: var(--grain-even), var(--mottle-even); background-size: auto, auto; background-repeat: repeat, repeat; background-blend-mode: soft-light, soft-light; }
+  body::before { content: ""; position: fixed; z-index: 40; left: 0; right: 0; top: 0; height: env(safe-area-inset-top); background: var(--card); pointer-events: none; }
+}
+
+/* while saving a picture, textures that use blend modes are drawn flat (the picture maker can't blend) */
+.exporting .tape, .exporting .ctape, .exporting .ctext.taped, .exporting .navtag { background-image: none !important; background-blend-mode: normal !important; background-color: #DCD5BE !important; }
+.exporting .frame::after, .exporting .slip::after, .exporting .ci-photo.fr-instant::after { display: none !important; }
+.exporting textarea::placeholder { color: transparent !important; }
+.exporting .ccap.empty { visibility: hidden; }

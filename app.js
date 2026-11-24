@@ -1,4 +1,4 @@
-export const VERSION = "40"; // bump on every change; shown at the bottom of Archive
+export const VERSION = "42"; // bump on every change; shown at the bottom of Archive
 // diary — app code. Loaded (and hot-swapped) by index.html.
 // mount(root, state) draws the app and returns an unmount function.
 
@@ -457,10 +457,9 @@ export async function mount(root, state) {
             ${editing ? "" : `<a class="daynav" href="${hrefOf(prevK)}" data-nav="prev" aria-label="Previous day">‹</a>`}
             <h1 class="page-title day-title big-date">${title}</h1>
             ${editing ? "" : isToday ? `<span class="daynav off" aria-hidden="true">›</span>` : `<a class="daynav" href="${hrefOf(nextK)}" data-nav="next" aria-label="Next day">›</a>`}
+            ${editing ? "" : `<span class="dayactions"><button class="link" data-decorate>Decorate</button><button class="link" data-saveimg>Save image</button></span>`}
           </div>
-          <div class="daysub">
-            ${editing ? `<span class="hint typed">Drag to move. Corner handle turns and resizes.</span>` : `<button class="link" data-decorate>Decorate</button>`}
-          </div>
+          ${editing ? `<div class="daysub"><span class="hint typed">Drag to move. Corner handle turns and resizes.</span></div>` : ""}
         </div>
         <div class="pagewrap paper-${paper}" id="pagewrap">
         <div class="board${editing ? " editing" : ""}" id="board"></div>
@@ -588,7 +587,10 @@ export async function mount(root, state) {
     const gap = loose ? 6 : 20, els = [...boardEl.querySelectorAll(".ci[data-row]")];
     const tall = [];
     els.forEach(el => { const r = +el.dataset.row; tall[r] = Math.max(tall[r] || 0, el.offsetHeight + (+el.dataset.drop || 0) * bw); });
-    const top = []; let y = .035 * bw;
+    // photos you placed yourself stay put; new photos start below the lowest of them
+    let locked = 0;
+    boardEl.querySelectorAll(".ci-photo:not([data-row])").forEach(el => { locked = Math.max(locked, el.offsetTop + el.offsetHeight); });
+    const top = []; let y = locked ? locked + gap + 14 : .035 * bw;
     for (let r = 0; r < tall.length; r++) { top[r] = y; y += (tall[r] || 0) + gap; }
     els.forEach(el => {
       const yy = (top[+el.dataset.row] + (+el.dataset.drop || 0) * bw) / bw;
@@ -1013,6 +1015,36 @@ export async function mount(root, state) {
     } catch { t.classList.remove("loading"); alert("That image couldn’t be loaded. Pick another one."); }
   }
 
+  // ---------- save the day as a picture ----------
+  async function saveImage(btn) {
+    const label = btn.textContent; btn.textContent = "Saving…"; btn.disabled = true;
+    const wrap = root.querySelector(".wrap");
+    root.classList.add("exporting");
+    try {
+      await flushText();
+      await document.fonts?.ready;
+      const { toBlob } = await import("./vendor/html-to-image.js");
+      const skip = el => !(el.classList && (el.matches(".dayactions, .daynav, .navtag, .nudge, .ci-add, .h-rot, .h-del")));
+      const blob = await toBlob(wrap, {
+        pixelRatio: Math.min(3, Math.max(2, devicePixelRatio || 2)),
+        backgroundColor: CARD, filter: skip, cacheBust: false,
+        style: { margin: "0", paddingBottom: "28px" },
+      });
+      const name = `diary-${route().date}.png`;
+      const file = new File([blob], name, { type: "image/png" });
+      if (touch() && navigator.canShare?.({ files: [file] })) {
+        await navigator.share({ files: [file] }); // choose "Save Image" to put it in Photos
+      } else {
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(file); a.download = name;
+        document.body.append(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+      }
+    } catch (err) {
+      if (err?.name !== "AbortError") { console.error(err); alert("The picture couldn’t be made. Try again."); }
+    } finally { root.classList.remove("exporting"); btn.textContent = label; btn.disabled = false; }
+  }
+
   // ---------- archive page ----------
   async function renderArchive() {
     const sum = await store.summary();
@@ -1222,7 +1254,7 @@ export async function mount(root, state) {
 
   // ---------- events (all removed on unmount) ----------
   on(document, "click", async e => {
-    const t = e.target.closest("[data-camera],[data-library],[data-open],[data-close],[data-step],[data-delete],[data-export],[data-import],[data-folder],[data-resume],[data-stopfolder],[data-importfolder],[data-font],[data-decorate],[data-deco],[data-tx],[data-sheet-close],[data-pick],[data-ph],[data-paper],[data-nav],[data-look],[data-dtab],[data-layer],[data-signin],[data-signout],[data-syncnow]");
+    const t = e.target.closest("[data-camera],[data-library],[data-open],[data-close],[data-step],[data-delete],[data-export],[data-import],[data-folder],[data-resume],[data-stopfolder],[data-importfolder],[data-font],[data-decorate],[data-deco],[data-tx],[data-sheet-close],[data-pick],[data-ph],[data-paper],[data-nav],[data-look],[data-dtab],[data-layer],[data-signin],[data-signout],[data-syncnow],[data-saveimg]");
     if (!t) {
       if (viewerEl && e.target.classList?.contains("stage")) closeViewer();
       if (sheetEl && e.target === sheetEl) closeCommons();
@@ -1252,6 +1284,7 @@ export async function mount(root, state) {
     else if (has("data-signin")) { try { await cloud?.signIn(); } catch (err) { alert("Sign-in didn’t work. Check your connection and try again."); console.error(err); } }
     else if (has("data-signout")) { await cloud?.signOut(); }
     else if (has("data-syncnow")) cloud?.sync();
+    else if (has("data-saveimg")) saveImage(t);
     else if (t.dataset.dtab) { decoTab = decoTab === t.dataset.dtab ? null : t.dataset.dtab; renderDecoBar(); }
     else if (t.dataset.paper) setPaper(t.dataset.paper);
     else if (t.dataset.look) {
