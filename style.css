@@ -639,3 +639,10 @@ header.top { padding-bottom: 12px; }
 .board.editing .ci.sel { touch-action: none; }
 /* text being written must be selectable, or iPhone Safari won't type into it */
 .board.editing .ci .ctext[contenteditable="true"], .board.editing .ci .sctext[contenteditable="true"] { -webkit-user-select: text; user-select: text; -webkit-touch-callout: default; }
+
+.add-more { display: flex; gap: 6px; align-items: baseline; justify-content: center; }
+.add-more .dot { color: var(--pencil); }
+.pastebox { position: fixed; inset: 0; z-index: 30; background: rgba(26,26,23,.4); display: grid; place-items: center; padding: 20px; }
+.pastebox-card { width: min(380px, 100%); background: var(--card); padding: 16px; border-radius: 3px; box-shadow: 0 12px 30px rgba(0,0,0,.25); text-align: center; }
+.pastebox-card p { margin: 0 0 12px; font-size: 14px; color: var(--ink); }
+.pastearea { height: 140px; background: var(--paper); border: 1.5px dashed rgba(44,43,39,.35); border-radius: 2px; margin-bottom: 10px; outline: none; -webkit-user-select: text; user-select: text; overflow: hidden; color: transparent; caret-color: var(--ink); }

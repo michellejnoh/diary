@@ -1,4 +1,4 @@
-export const VERSION = "56"; // bump on every change; shown at the bottom of Archive
+export const VERSION = "57"; // bump on every change; shown at the bottom of Archive
 // diary — app code. Loaded (and hot-swapped) by index.html.
 // mount(root, state) draws the app and returns an unmount function.
 
@@ -586,7 +586,7 @@ export async function mount(root, state) {
     const add = state.decorating ? "" : `
       <div class="ci ci-add" data-row="${addSlot.row}" data-vrow="${addSlot.row}" data-drop="${addSlot.drop}" style="${pos({ ...addSlot, rot: 0, z: 0 })}">
         <button class="add-tile" data-camera>${CAMERA}<span>${touch() ? "Take a photo" : "Add photos"}</span></button>
-        ${touch() ? `<button class="link small" data-library>or choose from library</button>` : ""}
+        <span class="add-more">${touch() ? `<button class="link small" data-library>library</button><span class="dot">·</span>` : ""}<button class="link small" data-pastephoto>paste</button></span>
       </div>`;
     boardEl.innerHTML = col.items.map(itemHTML).join("") + add;
     boardEl.querySelectorAll(".caption").forEach(grow);
@@ -785,6 +785,40 @@ export async function mount(root, state) {
     } catch { alert("That image couldn’t be added. Try another one."); }
     finally { URL.revokeObjectURL(src); }
   }
+  // paste a copied image as a regular photo of the day
+  async function pastePhoto() {
+    let blobs = [];
+    try {
+      if (navigator.clipboard?.read) {
+        for (const ci of await navigator.clipboard.read()) {
+          const type = ci.types.find(t => t.startsWith("image/"));
+          if (type) blobs.push(await ci.getType(type));
+        }
+      }
+    } catch {}
+    if (blobs.length) { addFiles(blobs.map((b, i) => new File([b], `pasted-${i}.png`, { type: b.type }))); return; }
+    openPasteBox(); // the browser wouldn't hand over the clipboard: let the person paste by hand
+  }
+  function openPasteBox() {
+    document.querySelector(".pastebox")?.remove();
+    const box = document.createElement("div");
+    box.className = "pastebox"; box.setAttribute("role", "dialog"); box.setAttribute("aria-modal", "true");
+    box.innerHTML = `<div class="pastebox-card">
+      <p class="typed">${touch() ? "Touch and hold inside the box, then tap Paste." : "Press ⌘V (Ctrl+V) to paste."}</p>
+      <div class="pastearea" contenteditable="true" aria-label="Paste a photo here"></div>
+      <button class="link" data-pasteclose>Cancel</button></div>`;
+    document.body.append(box);
+    const area = box.querySelector(".pastearea");
+    area.focus();
+    area.addEventListener("paste", e => {
+      const files = [...(e.clipboardData?.files || [])].filter(f => f.type.startsWith("image/"));
+      e.preventDefault();
+      if (!files.length) { box.querySelector("p").textContent = "That isn’t an image. Copy a photo first, then paste here."; return; }
+      box.remove(); addFiles(files);
+    });
+    box.addEventListener("click", e => { if (e.target === box || e.target.closest("[data-pasteclose]")) box.remove(); });
+  }
+
   async function pasteFromClipboard() {
     try {
       const items = await navigator.clipboard.read();
@@ -1299,7 +1333,7 @@ export async function mount(root, state) {
 
   // ---------- events (all removed on unmount) ----------
   on(document, "click", async e => {
-    const t = e.target.closest("[data-camera],[data-library],[data-open],[data-close],[data-step],[data-delete],[data-export],[data-import],[data-folder],[data-resume],[data-stopfolder],[data-importfolder],[data-font],[data-decorate],[data-deco],[data-tx],[data-sheet-close],[data-pick],[data-ph],[data-paper],[data-nav],[data-look],[data-dtab],[data-layer],[data-scrap],[data-signin],[data-signout],[data-syncnow],[data-saveimg]");
+    const t = e.target.closest("[data-camera],[data-library],[data-open],[data-close],[data-step],[data-delete],[data-export],[data-import],[data-folder],[data-resume],[data-stopfolder],[data-importfolder],[data-font],[data-decorate],[data-deco],[data-tx],[data-sheet-close],[data-pick],[data-ph],[data-paper],[data-nav],[data-look],[data-dtab],[data-layer],[data-scrap],[data-pastephoto],[data-signin],[data-signout],[data-syncnow],[data-saveimg]");
     if (!t) {
       if (viewerEl && e.target.classList?.contains("stage")) closeViewer();
       if (sheetEl && e.target === sheetEl) closeCommons();
@@ -1327,6 +1361,7 @@ export async function mount(root, state) {
     else if (t.dataset.ph) photoAction(t);
     else if (t.dataset.layer) layerAction(t.dataset.layer);
     else if (t.dataset.scrap) addScrap(t.dataset.scrap);
+    else if (has("data-pastephoto")) pastePhoto();
     else if (has("data-signin")) { try { await cloud?.signIn(); } catch (err) { alert("Sign-in didn’t work. Check your connection and try again."); console.error(err); } }
     else if (has("data-signout")) { await cloud?.signOut(); }
     else if (has("data-syncnow")) cloud?.sync();
@@ -1402,12 +1437,14 @@ export async function mount(root, state) {
     const q = e.target.q.value.trim(); if (q) searchCommons(q);
   });
   // paste an image anywhere on a day page = add it as a photo sticker
+  // pasting an image on a day page adds it as a photo of the day (in Decorate: as a sticker)
   on(document, "paste", e => {
-    if (route().page !== "day" || viewerEl || sheetEl) return;
-    const file = [...(e.clipboardData?.files || [])].find(f => f.type.startsWith("image/"));
-    if (!file) return;
+    if (route().page !== "day" || viewerEl || sheetEl || e.target.closest?.(".pastebox")) return;
+    if (e.target.matches?.("textarea, input") || e.target.isContentEditable) return; // pasting text into a note
+    const files = [...(e.clipboardData?.files || [])].filter(f => f.type.startsWith("image/"));
+    if (!files.length) return;
     e.preventDefault();
-    addImageBlob(file);
+    if (state.decorating) addImageBlob(files[0]); else addFiles(files);
   });
   on(stickerInput, "change", async () => { for (const f of [...stickerInput.files]) await addImageBlob(f); });
   on(document, "focusout", e => {
