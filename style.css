@@ -1,6 +1,6 @@
 /* All fonts live in /fonts. Korean files hold every Hangul syllable, so typing never flashes another font.
    size-adjust makes every font look the same size, so Korean and English sit evenly on one line. */
-@font-face { font-family: "Nanum Pen Script"; src: url("fonts/nanumpenscript.woff2?v=7") format("woff2"); size-adjust: 128%; font-display: swap; }
+@font-face { font-family: "Nanum Pen Script"; src: url("fonts/nanumpenscript.woff2?v=56") format("woff2"); size-adjust: 128%; font-display: swap; }
 @font-face { font-family: "Gaegu"; src: url("fonts/gaegu.woff2?v=7") format("woff2"); size-adjust: 108%; font-display: swap; }
 @font-face { font-family: "Poor Story"; src: url("fonts/poorstory.woff2?v=7") format("woff2"); size-adjust: 104%; font-display: swap; }
 @font-face { font-family: "Gowun Batang"; src: url("fonts/gowunbatang.woff2?v=7") format("woff2"); size-adjust: 86%; font-display: swap; }
