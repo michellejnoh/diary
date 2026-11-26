@@ -855,3 +855,39 @@ header.top::before {
   background-blend-mode: normal, multiply, multiply, soft-light;
   background-size: auto, 200px, 400px, 600px;
 }
+
+/* beige above the top bar when the page is pulled down */
+html { background-color: var(--bar); }
+
+/* ---------- account button in the top bar ---------- */
+header.top .barin { position: relative; }
+.me {
+  position: absolute; right: max(18px, env(safe-area-inset-right)); top: 50%; transform: translateY(-50%);
+  width: 28px; height: 28px; border-radius: 50%; overflow: hidden; display: grid; place-items: center;
+  background: var(--paper); color: var(--pencil); text-decoration: none;
+  box-shadow: 0 0 0 1px rgba(44,43,39,.22), 0 2px 4px -2px rgba(40,40,34,.4);
+}
+.me img { width: 100%; height: 100%; object-fit: cover; }
+.me svg { width: 18px; height: 18px; }
+.me span { font: 400 13px/1 var(--type); color: var(--ink); }
+
+/* ---------- profile page ---------- */
+.mecard { display: flex; align-items: center; gap: 14px; margin: 6px 0 0; }
+.mepic { width: 60px; height: 60px; border-radius: 50%; overflow: hidden; display: grid; place-items: center; background: var(--paper); box-shadow: 0 0 0 1px rgba(44,43,39,.2), 0 6px 12px -8px rgba(40,40,34,.5); flex: none; }
+.mepic img { width: 100%; height: 100%; object-fit: cover; }
+.mepic span { font: 400 24px/1 var(--type); color: var(--ink); }
+.mename { margin: 0; font: 400 19px/1.3 var(--type); color: var(--ink); }
+.memail { margin: 2px 0 0; font: 400 13px/1.3 var(--type); color: var(--pencil); }
+.mecard + .account { margin-top: 18px; }
+.setting { margin-top: 44px; max-width: 720px; }
+.setting .sub, .keep .sub { margin: -4px 0 12px; font-size: 13px; color: var(--pencil); }
+.font-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-bottom: 10px; }
+.paper-row { display: flex; flex-wrap: wrap; gap: 10px; }
+.paper-sw { width: 42px; height: 42px; border: 1px solid rgba(44,43,39,.22); border-radius: 2px; padding: 0; cursor: pointer; background-image: var(--grain); background-blend-mode: multiply; }
+.paper-sw[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--paper), 0 0 0 3.5px var(--ink); }
+.paper-sw.pb-card { background-color: #E9E5D8; } .paper-sw.pb-cream { background-color: #EFE6D2; } .paper-sw.pb-kraft { background-color: #C4A57A; }
+.paper-sw.pb-blush { background-color: #E8D4CC; } .paper-sw.pb-sage { background-color: #C6CFBA; } .paper-sw.pb-album { background-color: #23221F; } .paper-sw.pb-navy { background-color: #222B3B; }
+.paper-sw.pb-grid { background-color: #F3F1EA; background-image: linear-gradient(rgba(80,110,150,.3) 1px, transparent 1px), linear-gradient(90deg, rgba(80,110,150,.3) 1px, transparent 1px); background-size: 8px 8px; }
+.paper-sw.pb-dots { background-color: #F4F1E9; background-image: radial-gradient(rgba(80,90,100,.45) 1px, transparent 1.4px); background-size: 7px 7px; }
+.paper-sw.pb-lined { background-color: #F7F5EE; background-image: repeating-linear-gradient(transparent 0 7px, rgba(80,110,150,.35) 7px 8px); }
+.keep .month-title { margin-bottom: 10px; }

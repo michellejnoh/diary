@@ -1,4 +1,4 @@
-export const VERSION = "71"; // bump on every change; shown at the bottom of Archive
+export const VERSION = "72"; // bump on every change; shown at the bottom of Archive
 // diary — app code. Loaded (and hot-swapped) by index.html.
 // mount(root, state) draws the app and returns an unmount function.
 
@@ -250,7 +250,8 @@ const EN_FONTS = [
   { key: "indieflower", family: "Indie Flower", name: "Indie Flower" },
   { key: "ebgaramond", family: "EB Garamond", name: "EB Garamond" },
 ];
-const pickFont = list => list[0]; // fixed pair: Caveat + Nanum Pen Script
+const pickFont = (list, key) => list.find(f => f.key === key) || list[0]; // default pair: Caveat + Nanum Pen Script
+const defPaper = () => getPref("diary.paper", "card"); // paper for days that haven't picked one
 const getPref = (k, d) => { try { return localStorage.getItem(k) || d; } catch { return d; } };
 const fontsNow = () => ({
   ko: pickFont(KO_FONTS, getPref("diary.hand.ko", getPref("diary.hand", ""))),
@@ -424,6 +425,7 @@ export async function mount(root, state) {
   const route = () => {
     const h = location.hash;
     if (h === "#/archive") return { page: "archive" };
+    if (h === "#/me") return { page: "me" };
     const m = h.match(/^#\/day\/(\d{4}-\d{2}-\d{2})$/);
     if (m && m[1] < todayKey()) return { page: "day", date: m[1] };
     return { page: "day", date: todayKey() };
@@ -439,7 +441,7 @@ export async function mount(root, state) {
     root.style.minHeight = oldH + "px"; // hold the page height so nothing jumps while swapping
     const flip = state.navDir;
     const r = route();
-    if (r.page === "archive") await renderArchive(); else await renderDay(r.date);
+    if (r.page === "archive") await renderArchive(); else if (r.page === "me") renderMe(); else await renderDay(r.date);
     if (state.viewer && r.page === "day") openViewer(state.viewer, false);
     const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (flip && !reduce && r.page === "day") {
@@ -462,6 +464,14 @@ export async function mount(root, state) {
       : st.state === "error" ? `Sync stopped (${esc(st.error || "error")}). Tap Sync now to try again.` : t ? `Synced at ${t}.` : "";
     return `<p>Signed in as ${esc(st.user.email || st.user.name || "you")}. ${line}</p><div class="row"><button class="link" data-syncnow>Sync now</button><button class="link" data-signout>Sign out</button></div>`;
   }
+  // the little round account button in the top bar
+  function meButton() {
+    const u = cloudStatus?.user;
+    const inner = u?.photo ? `<img src="${esc(u.photo)}" alt="" referrerpolicy="no-referrer">`
+      : u?.name ? `<span>${esc(u.name.trim()[0].toUpperCase())}</span>`
+      : `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="9" r="3.6"/><path d="M5 20c1.2-3.6 4-5.4 7-5.4s5.8 1.8 7 5.4" stroke-linecap="round"/></svg>`;
+    return `<a class="me" href="#/me" aria-label="Your account and settings">${inner}</a>`;
+  }
   function backupLine() {
     if (cloudStatus?.user) return "";
     if (dir && !dirOK) return `<p class="nudge">Backup paused. <button class="link" data-resume>Resume</button></p>`;
@@ -483,13 +493,13 @@ export async function mount(root, state) {
     const nextK = keyOf(new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1));
     const hrefOf = k2 => k2 === todayKey() ? "#/" : `#/day/${k2}`;
     state.navDir = null;
-    const paper = day.paper || "card";
+    const paper = day.paper || defPaper();
     const title = `<span class="sr">${isToday ? "Today, " : WEEKDAYS[d.getDay()] + ", "}</span>${d.getDate()} ${MONTHS[d.getMonth()].slice(0, 3).toUpperCase()} ${d.getFullYear()}`; // like an office date stamp
 
     root.innerHTML = `
       <div class="wrap${editing ? " decorating" : ""}">
         <header class="top"><div class="barin topstack">
-          <a class="wordmark bigmark" href="#/">Diary</a>
+          <a class="wordmark bigmark" href="#/">Diary</a>${meButton()}
           <div class="daterow"><h1 class="page-title day-title big-date datestamp">${title}</h1></div>
         </div></header>
         ${editing ? `<div class="dayhead"><div class="daysub"><span class="hint typed">Drag to move. Corner handle turns and resizes.</span></div></div>` : ""}
@@ -683,7 +693,7 @@ export async function mount(root, state) {
     for (const p of photos) if (!have.has(p.id)) items.push({ id: newId(), kind: "photo", ref: p.id, auto: true, z: ++z });
     if (items.some(i => i.kind !== "photo") && items.some(i => i.kind === "photo" && i.auto && i.x != null)) items.forEach(i => { if (i.kind === "photo" && i.x != null) delete i.auto; });
     col = { items };
-    paperNow = day.paper || "card";
+    paperNow = day.paper || defPaper();
     assets = preAssets || {};
     boardEl.style.setProperty("--bw", boardEl.clientWidth + "px");
     lastW = boardEl.clientWidth;
@@ -1017,7 +1027,7 @@ export async function mount(root, state) {
       const sn = state.decoSnap;
       if (sn) {
         col.items = structuredClone(sn.items);
-        await store.patchDay(colKey, { collage: { items: col.items }, paper: sn.paper === "card" ? undefined : sn.paper });
+        await store.patchDay(colKey, { collage: { items: col.items }, paper: sn.paper === defPaper() ? undefined : sn.paper });
         paperNow = sn.paper; changed();
       }
       await cleanAssets(col.items);
@@ -1070,7 +1080,7 @@ export async function mount(root, state) {
     if (record && v !== paperNow) checkpoint();
     paperNow = v;
     const pw = root.querySelector("#pagewrap"); if (pw) pw.className = paperClass(v);
-    await store.patchDay(colKey, { paper: v === "card" ? undefined : v }); changed();
+    await store.patchDay(colKey, { paper: v === defPaper() ? undefined : v }); changed();
     renderDecoBar();
   }
   function textAction(t) {
@@ -1217,6 +1227,28 @@ export async function mount(root, state) {
         </section>`;
     }
 
+    root.innerHTML = `
+      <div class="wrap">
+        <header class="top"><div class="barin topstack">
+          <a class="wordmark bigmark" href="#/">Diary</a>${meButton()}
+          <div class="daterow"><h1 class="page-title day-title big-date datestamp">ARCHIVE</h1></div>
+        </div></header>
+        <p class="summary">${photoTotal ? `${photoTotal} photo${photoTotal > 1 ? "s" : ""} over ${dates.length} day${dates.length > 1 ? "s" : ""}` : "Nothing here yet."}</p>
+        <div class="months">${months}</div>
+
+      </div>
+      <nav class="botbar" aria-label="Pages"><div class="barin"><a class="barbtn" href="#/">Today</a></div></nav>`;
+    window.scrollTo(0, state.scroll?.[location.hash] || 0);
+  }
+
+
+  // ---------- account and settings ----------
+  function meCardHTML() {
+    const u = cloudStatus?.user;
+    return `<div class="mepic">${u?.photo ? `<img src="${esc(u.photo)}" alt="" referrerpolicy="no-referrer">` : `<span>${esc((u?.name || "D").trim()[0].toUpperCase())}</span>`}</div>
+      <div><p class="mename">${esc(u?.name || "Your diary")}</p>${u?.email ? `<p class="memail">${esc(u.email)}</p>` : `<p class="memail">Not signed in</p>`}</div>`;
+  }
+  function renderMe() {
     const lb = ls.get(LAST_BACKUP);
     const when = lb ? new Date(lb).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : null;
     let status, actions;
@@ -1234,17 +1266,33 @@ export async function mount(root, state) {
       actions = `<button class="link" data-export>Save backup</button>`;
     }
 
+    const u = cloudStatus?.user;
+    const { ko, en } = fontsNow();
+    const fontBtns = (list, lang, cur, sample) => list.map(f => `<button class="font-opt" data-font="${f.key}" data-lang="${lang}" aria-pressed="${f.key === cur.key}"><span class="sample" style="font-family:'${f.family}'">${sample}</span><span class="name">${esc(f.name)}</span></button>`).join("");
     root.innerHTML = `
       <div class="wrap">
         <header class="top"><div class="barin topstack">
-          <a class="wordmark bigmark" href="#/">Diary</a>
-          <div class="daterow"><h1 class="page-title day-title big-date datestamp">ARCHIVE</h1></div>
+          <a class="wordmark bigmark" href="#/">Diary</a>${meButton()}
+          <div class="daterow"><h1 class="page-title day-title big-date datestamp">PROFILE</h1></div>
         </div></header>
-        <p class="summary">${photoTotal ? `${photoTotal} photo${photoTotal > 1 ? "s" : ""} over ${dates.length} day${dates.length > 1 ? "s" : ""}` : "Nothing here yet."}</p>
-        <div class="months">${months}</div>
-
+        <section class="mecard">${meCardHTML()}</section>
         <section class="account keep" id="account">${accountHTML()}</section>
+
+        <section class="setting">
+          <h2 class="month-title">Handwriting</h2>
+          <p class="typed sub">For your notes and captions.</p>
+          <div class="font-grid">${fontBtns(KO_FONTS, "ko", ko, "오늘 하루")}</div>
+          <div class="font-grid">${fontBtns(EN_FONTS, "en", en, "Today")}</div>
+        </section>
+
+        <section class="setting">
+          <h2 class="month-title">Paper</h2>
+          <p class="typed sub">For days you haven’t decorated.</p>
+          <div class="paper-row">${PAPERS.map(([f, n]) => `<button class="paper-sw pb-${f}" data-defpaper="${f}" aria-label="${n}" title="${n}" aria-pressed="${defPaper() === f}"></button>`).join("")}</div>
+        </section>
+
         <div class="keep">
+          <h2 class="month-title">Backup</h2>
           <p>${status}</p>
           <div class="row">${actions}</div>
           <div class="row">
@@ -1254,8 +1302,8 @@ export async function mount(root, state) {
         </div>
         <p class="version typed">version ${VERSION}</p>
       </div>
-      <nav class="botbar" aria-label="Pages"><div class="barin"><a class="barbtn" href="#/">Today</a></div></nav>`;
-    window.scrollTo(0, state.scroll?.[location.hash] || 0);
+      <nav class="botbar" aria-label="Pages"><div class="barin"><a class="barbtn" href="#/">Today</a><a class="barbtn" href="#/archive">Archive</a></div></nav>`;
+    window.scrollTo(0, 0);
   }
 
   // ---------- viewer ----------
@@ -1393,7 +1441,7 @@ export async function mount(root, state) {
 
   // ---------- events (all removed on unmount) ----------
   on(document, "click", async e => {
-    const t = e.target.closest("[data-camera],[data-library],[data-open],[data-close],[data-step],[data-delete],[data-export],[data-import],[data-folder],[data-resume],[data-stopfolder],[data-importfolder],[data-font],[data-decorate],[data-deco],[data-tx],[data-sheet-close],[data-pick],[data-ph],[data-paper],[data-nav],[data-look],[data-dtab],[data-layer],[data-scrap],[data-pastephoto],[data-signin],[data-signout],[data-syncnow],[data-saveimg]");
+    const t = e.target.closest("[data-camera],[data-library],[data-open],[data-close],[data-step],[data-delete],[data-export],[data-import],[data-folder],[data-resume],[data-stopfolder],[data-importfolder],[data-font],[data-decorate],[data-deco],[data-tx],[data-sheet-close],[data-pick],[data-ph],[data-paper],[data-nav],[data-look],[data-dtab],[data-layer],[data-scrap],[data-pastephoto],[data-signin],[data-signout],[data-syncnow],[data-saveimg],[data-defpaper]");
     if (!t) {
       if (viewerEl && e.target.classList?.contains("stage")) closeViewer();
       if (sheetEl && e.target === sheetEl) closeCommons();
@@ -1437,6 +1485,10 @@ export async function mount(root, state) {
     else if (t.dataset.nav) state.navDir = t.dataset.nav === "prev" ? "right" : "left"; // link does the rest
     else if (has("data-sheet-close")) closeCommons();
     else if (t.dataset.pick) pickCommons(t);
+    else if (t.dataset.defpaper) {
+      try { localStorage.setItem("diary.paper", t.dataset.defpaper); } catch {}
+      root.querySelectorAll("[data-defpaper]").forEach(b => b.setAttribute("aria-pressed", String(b === t)));
+    }
     else if (t.dataset.font) {
       const lang = t.dataset.lang;
       try { localStorage.setItem(`diary.hand.${lang}`, t.dataset.font); } catch {}
@@ -1553,7 +1605,7 @@ export async function mount(root, state) {
     cloudConfigured = !!cfg?.apiKey;
     if (cloudConfigured) {
       cloud = await C.startCloud(cfg, local, {
-        onStatus: st => { cloudStatus = st; const a = root.querySelector("#account"); if (a) a.innerHTML = accountHTML(); },
+        onStatus: st => { cloudStatus = st; const a = root.querySelector("#account"); if (a) a.innerHTML = accountHTML(); root.querySelectorAll(".me").forEach(m => m.outerHTML = meButton()); const mc = root.querySelector(".mecard"); if (mc) mc.innerHTML = meCardHTML(); },
         onRemoteChange: () => {
           const busy = state.decorating || document.activeElement?.matches?.("textarea, input, [contenteditable='true']") || sheetEl;
           if (busy) pendingRemote = true; else render();
