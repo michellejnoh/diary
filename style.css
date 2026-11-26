@@ -581,6 +581,35 @@ img.cut, .cut-scrap {
 .sc-clip svg { display: block; width: 100%; height: auto; filter: drop-shadow(0 2px 2px rgba(30,30,25,.3)); }
 .scrap.sc-clip { filter: none; }
 
+
+/* ---------- more papers ---------- */
+.pagewrap.paper-cream::before { background-color: #EFE6D2; background-image: var(--grain), var(--mottle); background-blend-mode: multiply; box-shadow: 0 1px 1px rgba(40,40,34,.18), 0 12px 24px -16px rgba(40,40,34,.45); }
+.pagewrap.paper-blush::before { background-color: #E8D4CC; background-image: var(--grain), var(--mottle); background-blend-mode: multiply; box-shadow: 0 1px 1px rgba(40,40,34,.18), 0 12px 24px -16px rgba(40,40,34,.45); }
+.pagewrap.paper-sage::before { background-color: #C6CFBA; background-image: var(--grain), var(--mottle); background-blend-mode: multiply; box-shadow: 0 1px 1px rgba(40,40,34,.18), 0 12px 24px -16px rgba(40,40,34,.45); }
+.pagewrap.paper-dots::before {
+  background-color: #F4F1E9; background-image: radial-gradient(rgba(80,90,100,.32) 1.1px, transparent 1.4px), var(--grain);
+  background-size: 18px 18px, auto; background-blend-mode: normal, multiply; box-shadow: 0 1px 1px rgba(40,40,34,.18), 0 12px 24px -16px rgba(40,40,34,.45);
+}
+.pagewrap.paper-lined::before {
+  background-color: #F7F5EE;
+  background-image: linear-gradient(90deg, transparent 34px, rgba(205,90,80,.45) 34px, rgba(205,90,80,.45) 35.5px, transparent 35.5px),
+                    repeating-linear-gradient(transparent 0 27px, rgba(80,110,150,.24) 27px 28px), var(--grain);
+  background-blend-mode: normal, normal, multiply; box-shadow: 0 1px 1px rgba(40,40,34,.18), 0 12px 24px -16px rgba(40,40,34,.45);
+}
+.pagewrap.paper-navy::before { background-color: #222B3B; background-image: var(--grain); background-blend-mode: screen; box-shadow: 0 1px 1px rgba(0,0,0,.3), 0 14px 26px -16px rgba(0,0,0,.6); }
+.decobar .paper-btn { padding: 0 10px; }
+.pagewrap.dark .caption, .pagewrap.dark .ccap { color: #EEEBE2; }
+.pagewrap.dark .caption::placeholder { color: #A9A79E; }
+.pagewrap.dark .time { color: #A9A79E; }
+.pagewrap.dark .add-tile { color: #EEEBE2; background: #3A3935; }
+.pagewrap.dark .add-tile .cam { color: #EEEBE2; }
+.pagewrap.dark .link { color: #D2CFC5; }
+.pagewrap.dark .ci-photo.fr-instant .caption, .pagewrap.dark .ci-photo.fr-instant .ccap { color: var(--ink); }
+.pagewrap.dark .ci-photo.fr-instant .time { color: var(--pencil); }
+.pagewrap.dark .ci-photo.fr-instant .caption, .pagewrap.dark .ci-photo.fr-instant .ccap { color: var(--ink); }
+.pagewrap.dark .ci-photo.fr-instant .time { color: var(--pencil); }
+.look-loose .pagewrap:not(.paper-card)::before { box-shadow: none; }
+
 .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 /* one moment of motion: a new print develops */

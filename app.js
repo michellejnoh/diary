@@ -1,4 +1,4 @@
-export const VERSION = "60"; // bump on every change; shown at the bottom of Archive
+export const VERSION = "61"; // bump on every change; shown at the bottom of Archive
 // diary — app code. Loaded (and hot-swapped) by index.html.
 // mount(root, state) draws the app and returns an unmount function.
 
@@ -186,6 +186,10 @@ const SCRAPS = [["ticket", "Ticket"], ["receipt", "Receipt"], ["note", "Note"], 
 const SCRAP_SIZE = { ticket: .36, receipt: .24, stamp: .17, note: .32, label: .3, clip: .07 };
 const SCRAP_HINT = { ticket: "ADMIT ONE", receipt: "write here", stamp: "", note: "write here", label: "label" };
 const CLIP_SVG = `<svg viewBox="0 0 20 60" aria-hidden="true" fill="none" stroke="#8E918A" stroke-width="2.2" stroke-linecap="round"><path d="M14 18v26a5 5 0 0 1-10 0V10a6.5 6.5 0 0 1 13 0v34"/><path d="M7.5 16v26a2.5 2.5 0 0 0 5 0V18" opacity=".9"/></svg>`;
+// papers for the day: [key, label]; dark ones get light writing
+const PAPERS = [["card", "Card"], ["cream", "Cream"], ["kraft", "Kraft"], ["blush", "Blush"], ["sage", "Sage"], ["grid", "Grid"], ["dots", "Dots"], ["lined", "Lined"], ["album", "Album"], ["navy", "Navy"]];
+const DARK_PAPERS = new Set(["album", "navy"]);
+const paperClass = p => `pagewrap paper-${p}${DARK_PAPERS.has(p) ? " dark" : ""}`;
 const ROTATE_ICON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18.5 9.5a7 7 0 1 0 .8 5.6"/><path d="M19 4.5v5h-5"/></svg>`;
 
 // ---------- backup bookkeeping ----------
@@ -466,7 +470,7 @@ export async function mount(root, state) {
           </div>
           ${editing ? `<div class="daysub"><span class="hint typed">Drag to move. Corner handle turns and resizes.</span></div>` : ""}
         </div>
-        <div class="pagewrap paper-${paper}" id="pagewrap">
+        <div class="${paperClass(paper)}" id="pagewrap">
         <div class="board${editing ? " editing" : ""}" id="board"></div>
         <div class="slip">
           <span class="tape" aria-hidden="true"></span>
@@ -927,7 +931,7 @@ export async function mount(root, state) {
     const opt = {
       scraps: () => SCRAPS.map(([k, n]) => b(`data-scrap="${k}"`, n)).join(""),
       add: () => `${b('data-deco="text"', "Text")}${b('data-deco="photo"', "Photo")}${b('data-deco="paste"', "Paste")}${b('data-deco="commons"', "Wikimedia")}`,
-      page: () => `<span class="group">${[["card", "Card"], ["kraft", "Kraft"], ["grid", "Grid"], ["album", "Album"]].map(([f, n]) => b(`data-paper="${f}" class="paper-btn pb-${f}"`, n, curPaper() === f)).join("")}</span>
+      page: () => `${PAPERS.map(([f, n]) => b(`data-paper="${f}" class="paper-btn pb-${f}"`, n, curPaper() === f)).join("")}<span class="group-sep"></span>
         ${b('data-deco="tidy"', "Tidy up")}`,
       style: () => `<span class="group">${[["hand", "Hand"], ["type", "Type"], ["press", "Press"], ["cut", "Cutout"]].map(([f, n]) => b(`data-tx="font" data-v="${f}" class="f-${f}"`, n, (it.font || "hand") === f)).join("")}</span>
         ${b('data-tx="tape" aria-label="Tape behind text"', `<span class="tape-swatch"></span>`, it.tape)}`,
@@ -1032,7 +1036,7 @@ export async function mount(root, state) {
   async function setPaper(v, record = true) {
     if (record && v !== paperNow) checkpoint();
     paperNow = v;
-    const pw = root.querySelector("#pagewrap"); if (pw) pw.className = `pagewrap paper-${v}`;
+    const pw = root.querySelector("#pagewrap"); if (pw) pw.className = paperClass(v);
     await store.patchDay(colKey, { paper: v === "card" ? undefined : v }); changed();
     renderDecoBar();
   }

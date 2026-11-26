@@ -74,7 +74,7 @@ export async function renderDay(opt) {
 
   // canvas shaped like the screen (portrait)
   const sw = Math.min(screen.width, screen.height) || 390, sh = Math.max(screen.width, screen.height) || 844;
-  const W = 1170, H = Math.round(W * sh / sw), u = W / 390; // u: one CSS pixel on a 390-wide phone
+  const W = 1170, H = 1560, u = W / 390; // 3:4 picture; u = one CSS pixel on a 390-wide phone
   const cv = document.createElement("canvas"); cv.width = W; cv.height = H;
   const ctx = cv.getContext("2d");
   ctx.fillStyle = CARD; ctx.fillRect(0, 0, W, H);
@@ -83,10 +83,10 @@ export async function renderDay(opt) {
   // ---- header: cut-out "Diary" and the date ----
   const M = 22 * u; let y = 34 * u;
   await document.fonts.load('56px "IM Fell English"').catch(() => {});
-  const lh = 50 * u;
-  ctx.font = `${56 * u}px "IM Fell English", Georgia, serif`; ctx.fillStyle = "#24231F";
+  const lh = 40 * u;
+  ctx.font = `${44 * u}px "IM Fell English", Georgia, serif`; ctx.fillStyle = "#24231F";
   ctx.fillText("Diary", M, y + lh * .85);
-  y += lh + 34 * u;
+  y += lh + 26 * u;
   ctx.font = `${22 * u}px "Special Elite", "Courier New", monospace`; ctx.textBaseline = "alphabetic";
   ctx.fillStyle = PENCIL; ctx.fillText(titleSoft, M, y);
   ctx.fillStyle = INK; ctx.fillText(titleMain, M + ctx.measureText(titleSoft + " ").width, y);
@@ -98,7 +98,7 @@ export async function renderDay(opt) {
   let noteLines = [], noteH = 0;
   if (hasNote) {
     ctx.font = noteFont;
-    noteLines = wrapLines(ctx, note, W - 2 * M - 44 * u).slice(0, 8);
+    noteLines = wrapLines(ctx, note, W - 2 * M - 44 * u).slice(0, 4);
     noteH = 22 * u + Math.max(1, noteLines.length) * lineH + 18 * u;
   }
   const bottom = H - 36 * u - (hasNote ? noteH + 30 * u : 0);
@@ -107,7 +107,7 @@ export async function renderDay(opt) {
   const els = [...boardEl.querySelectorAll(".ci[data-id]")];
   const geo = els.map(el => {
     const it = items.find(i => i.id === el.dataset.id); if (!it) return null;
-    const g = { it, el, x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight, rot: it.rot || 0, z: it.z || 1 };
+    const g = { it, el, x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight, rot: it.kind === "photo" ? 0 : (it.rot || 0), z: it.z || 1 }; // photos sit straight in the picture
     const rad = Math.abs(g.rot) * Math.PI / 180, bw = g.w * Math.cos(rad) + g.h * Math.sin(rad), bh = g.w * Math.sin(rad) + g.h * Math.cos(rad);
     g.l = g.x + g.w / 2 - bw / 2; g.r = g.x + g.w / 2 + bw / 2; g.t = g.y + g.h / 2 - bh / 2; g.b = g.y + g.h / 2 + bh / 2;
     return g;
@@ -144,19 +144,25 @@ export async function renderDay(opt) {
   const pw = gr => (gr.members[0].it.kind === "photo" ? gr.members[0].w : gr.w); // the photo's own width sets the size
   const layout = c => {
     const cw = (AW - gap * (c - 1)) / c, rows = [];
-    for (let i = 0; i < groups.length; i += c) rows.push(groups.slice(i, i + c));
+    const nRows = Math.ceil(groups.length / c), per = Math.ceil(groups.length / nRows); // balanced rows: 7 photos -> 4 + 3, not 5 + 2
+    for (let i = 0; i < groups.length; i += per) rows.push(groups.slice(i, i + per));
     const rowH = rows.map(r => Math.max(...r.map(g => g.h * cw / pw(g))));
     return { c, cw, rows, rowH, total: rowH.reduce((a, b) => a + b, 0) + gap * (rows.length - 1) };
   };
-  let plan = null;
-  for (let c = 1; c <= 5; c++) { plan = layout(c); if (plan.total <= AH) break; }
-  const f = Math.min(1, AH / plan.total); // still too tall at 5 per row: shrink everything evenly
+  // pick the column count that gives the biggest photos once everything fits
+  let plan = null, best = 0;
+  for (let c = 1; c <= Math.min(5, groups.length); c++) {
+    const L = layout(c), size = L.cw * Math.min(1, AH / L.total);
+    if (size > best) { best = size; plan = L; }
+  }
+  const f = Math.min(1, AH / plan.total);
   const cw = plan.cw * f, g2 = gap * f, gridW = plan.c * cw + g2 * (plan.c - 1);
   const avgPW = groups.reduce((a, g) => a + pw(g), 0) / groups.length, ts = cw / avgPW; // one text size for every photo
   let yy = contentTop + Math.max(0, (AH - plan.total * f) / 2);
   plan.rows.forEach((r, ri) => {
+    const rowW = r.length * cw + g2 * (r.length - 1); // each row centered
     r.forEach((g, ci) => {
-      const lead = g.members[0], colX = M + (AW - gridW) / 2 + ci * (cw + g2);
+      const lead = g.members[0], colX = M + (AW - rowW) / 2 + ci * (cw + g2);
       g.s = cw / pw(g);
       g.ox = colX - (lead.it.kind === "photo" ? lead.l : g.l) * g.s;
       g.oy = yy - g.t * g.s;
@@ -170,8 +176,17 @@ export async function renderDay(opt) {
   if (paper !== "card") {
     const px = 8 * u, py = contentTop - 14 * u, pw = W - 16 * u, phh = H - 20 * u - py;
     ctx.save(); shadow(ctx, u, .8);
-    ctx.fillStyle = { kraft: "#C4A57A", grid: "#F3F1EA", album: "#23221F" }[paper] || PAPER;
+    ctx.fillStyle = { kraft: "#C4A57A", grid: "#F3F1EA", album: "#23221F", cream: "#EFE6D2", blush: "#E8D4CC", sage: "#C6CFBA", dots: "#F4F1E9", lined: "#F7F5EE", navy: "#222B3B" }[paper] || PAPER;
     ctx.fillRect(px, py, pw, phh); noShadow(ctx);
+    if (paper === "dots") {
+      ctx.fillStyle = "rgba(80,90,100,.32)"; const step = 18 * u;
+      for (let gx = px + step / 2; gx < px + pw; gx += step) for (let gy = py + step / 2; gy < py + phh; gy += step) { ctx.beginPath(); ctx.arc(gx, gy, 1.2 * u, 0, 7); ctx.fill(); }
+    }
+    if (paper === "lined") {
+      ctx.strokeStyle = "rgba(80,110,150,.24)"; ctx.lineWidth = 1 * u;
+      for (let gy = py + 28 * u; gy < py + phh; gy += 28 * u) { ctx.beginPath(); ctx.moveTo(px, gy); ctx.lineTo(px + pw, gy); ctx.stroke(); }
+      ctx.strokeStyle = "rgba(205,90,80,.45)"; ctx.lineWidth = 1.5 * u; ctx.beginPath(); ctx.moveTo(px + 34 * u, py); ctx.lineTo(px + 34 * u, py + phh); ctx.stroke();
+    }
     if (paper === "grid") {
       ctx.strokeStyle = "rgba(80,110,150,.2)"; ctx.lineWidth = 1 * u; const step = 22 * u;
       for (let gx = px; gx <= px + pw; gx += step) { ctx.beginPath(); ctx.moveTo(gx, py); ctx.lineTo(gx, py + phh); ctx.stroke(); }
@@ -249,7 +264,7 @@ function drawPhoto(ctx, g, el, img, p, s, opt) {
   if (cap && p) {
     const cx = cap.offsetLeft * s, cy = cap.offsetTop * s, cw = cap.offsetWidth * s;
     const timeEl = cap.querySelector(".time"); let ty = cy + 2 * s;
-    const album = opt.paper === "album" && kind !== "instant";
+    const album = (opt.paper === "album" || opt.paper === "navy") && kind !== "instant"; // dark paper: light writing
     const t = g.ts || s; // same text size on every photo
     if (timeEl) { ctx.font = `${12 * t}px "Special Elite", monospace`; ctx.fillStyle = album ? "#A9A79E" : opt.paper === "kraft" && kind !== "instant" ? "#5E4B30" : PENCIL; ty += 12 * t; ctx.fillText(timeEl.textContent, cx + 4 * s, ty); ty += 4 * t; }
     if (p.caption) {
