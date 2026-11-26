@@ -843,9 +843,6 @@ header.top .wordmark.bigmark {
   font: 400 clamp(30px, 9vw, 40px)/1.5 var(--pen); -webkit-text-stroke: 0; letter-spacing: 0; color: #26252A;
   filter: url(#pen); padding: 6px 4px 0 2px; margin-bottom: -6px;
 }
-/* the same hand here and there */
-.add-tile span { font: 400 14px/1.6 var(--pen); filter: url(#pen); }
-.summary { font: 400 15px/1.9 var(--pen); color: var(--ink); filter: url(#pen); }
 
 /* paper texture on the bars, fading out toward the screen edge so it meets the phone's own bar without a line */
 header.top::before {
