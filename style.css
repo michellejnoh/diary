@@ -811,7 +811,7 @@ header.top::after { right: 16%; bottom: -15px; transform: rotate(-5deg); }
 @font-face { font-family: "Stamp"; src: url("fonts/oswald-stamp.woff2?v=1") format("woff2"); font-display: swap; }
 header.top .daterow .page-title.datestamp {
   display: inline-block; color: #A8342A; font: 600 clamp(18px, 5.4vw, 22px)/1 "Stamp", "Arial Narrow", sans-serif; letter-spacing: .09em;
-  transform: rotate(-2.5deg); transform-origin: left center; margin: 6px 0 2px; mix-blend-mode: multiply; filter: url(#ink);
+  transform: rotate(-2.5deg); transform-origin: left center; margin: 6px 0 2px; filter: url(#ink);
   -webkit-mask-image: linear-gradient(97deg, rgba(0,0,0,.5), #000 35%, #000 70%, rgba(0,0,0,.72)); mask-image: linear-gradient(97deg, rgba(0,0,0,.5), #000 35%, #000 70%, rgba(0,0,0,.72));
 }
 /* an empty day: a blank print waiting for a photo */
