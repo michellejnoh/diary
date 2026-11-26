@@ -970,3 +970,13 @@ body[data-paper="album"] .plainpage .font-opt:not([aria-pressed="true"]), body[d
 body[data-paper="album"] .plainpage .chip, body[data-paper="navy"] .plainpage .chip { color: #EEEBE2; border-color: rgba(238,235,226,.4); }
 body[data-paper="kraft"] .plainpage, body[data-paper="sage"] .plainpage, body[data-paper="blush"] .plainpage { --pencil: #4E4636; }
 body[data-paper="kraft"] .plainpage .mecard, body[data-paper="kraft"] .plainpage .font-opt { --pencil: #67695F; }
+
+/* ---------- bars truly fixed to the screen (sticky + filters misbehave in iPhone Safari) ---------- */
+header.top { position: fixed !important; top: 0; left: 0; right: 0; width: auto; margin: 0 !important; filter: none !important; }
+.botbar { filter: none !important; }
+.wrap { padding-top: calc(var(--toph, 120px) + 26px) !important; padding-bottom: calc(var(--both, 70px) + 40px) !important; }
+/* a soft edge instead of the filter shadow */
+header.top::before { box-shadow: none; }
+
+/* sheets, the photo viewer and the paste box sit above the bars */
+.sheet, .pastebox, .viewer { z-index: 60 !important; }

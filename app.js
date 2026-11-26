@@ -1,4 +1,4 @@
-export const VERSION = "79"; // bump on every change; shown at the bottom of Archive
+export const VERSION = "80"; // bump on every change; shown at the bottom of Archive
 // diary — app code. Loaded (and hot-swapped) by index.html.
 // mount(root, state) draws the app and returns an unmount function.
 
@@ -446,6 +446,18 @@ export async function mount(root, state) {
   let dayPhotos = [];
   let developIds = new Set();
 
+  // the bars are fixed to the screen; the page leaves room for them by their real heights
+  const barRO = typeof ResizeObserver !== "undefined" ? new ResizeObserver(() => sizeBars()) : null;
+  function sizeBars() {
+    const t = root.querySelector("header.top"), b = root.querySelector(".botbar");
+    document.documentElement.style.setProperty("--toph", (t ? t.offsetHeight : 0) + "px");
+    document.documentElement.style.setProperty("--both", (b ? b.offsetHeight : 0) + "px");
+  }
+  function watchBars() {
+    sizeBars(); if (!barRO) return;
+    barRO.disconnect();
+    root.querySelectorAll("header.top, .botbar").forEach(el => barRO.observe(el));
+  }
   async function render() {
     await flushText();
     const old = urls; urls = [];
@@ -454,6 +466,7 @@ export async function mount(root, state) {
     const flip = state.navDir;
     const r = route();
     if (r.page === "archive") await renderArchive(); else if (r.page === "me") await renderMe(); else await renderDay(r.date);
+    watchBars();
     if (state.viewer && r.page === "day") openViewer(state.viewer, false);
     const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (flip && !reduce && r.page === "day") {
