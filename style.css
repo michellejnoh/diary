@@ -531,7 +531,7 @@ img.cut, .cut-scrap {
 .ci-scrap { container-type: inline-size; }
 .scrap { position: relative; display: block; color: var(--ink); filter: drop-shadow(0 1px 1px rgba(40,40,34,.25)) drop-shadow(0 5px 6px rgba(40,40,34,.18)); }
 .sctext { display: block; outline: none; white-space: pre-wrap; word-break: keep-all; min-height: 1em; }
-.sctext:empty::before { content: attr(data-ph); opacity: .4; }
+.sctext:empty::before { content: attr(data-hint); opacity: .4; }
 .board:not(.editing) .sctext:empty::before { content: ""; }
 .board.editing .sctext[contenteditable="true"] { cursor: text; outline: 1px dashed rgba(44,43,39,.3); }
 

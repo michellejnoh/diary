@@ -1,4 +1,4 @@
-export const VERSION = "59"; // bump on every change; shown at the bottom of Archive
+export const VERSION = "60"; // bump on every change; shown at the bottom of Archive
 // diary — app code. Loaded (and hot-swapped) by index.html.
 // mount(root, state) draws the app and returns an unmount function.
 
@@ -182,7 +182,7 @@ const cutChar = (ch, i) => {
   return `<span class="cut cut-scrap" style="--r:${r}deg;--y:${y}em">${esc(ch)}</span>`;
 };
 // paper scraps for Decorate: [type, label]
-const SCRAPS = [["ticket", "Ticket"], ["receipt", "Receipt"], ["stamp", "Stamp"], ["note", "Note"], ["label", "Label"], ["clip", "Clip"]];
+const SCRAPS = [["ticket", "Ticket"], ["receipt", "Receipt"], ["note", "Note"], ["label", "Label"], ["clip", "Clip"]];
 const SCRAP_SIZE = { ticket: .36, receipt: .24, stamp: .17, note: .32, label: .3, clip: .07 };
 const SCRAP_HINT = { ticket: "ADMIT ONE", receipt: "write here", stamp: "", note: "write here", label: "label" };
 const CLIP_SVG = `<svg viewBox="0 0 20 60" aria-hidden="true" fill="none" stroke="#8E918A" stroke-width="2.2" stroke-linecap="round"><path d="M14 18v26a5 5 0 0 1-10 0V10a6.5 6.5 0 0 1 13 0v34"/><path d="M7.5 16v26a2.5 2.5 0 0 0 5 0V18" opacity=".9"/></svg>`;
@@ -227,7 +227,7 @@ function applyHand() {
   document.fonts?.load(`20px "${en.family}"`, "a");
 }
 const LOOK = "diary.look";
-const lookNow = () => getPref(LOOK, "loose");
+const lookNow = () => "loose"; // one page look for everyone (the Neat/Loose switch was removed)
 function applyLook() {
   const l = lookNow();
   document.documentElement.classList.toggle("look-loose", l === "loose");
@@ -566,7 +566,7 @@ export async function mount(root, state) {
       inner = `<div class="ctextbox" style="font-size:calc(var(--bw) * ${i.fs})"><span class="${cls}" style="${textStyle(i)}" spellcheck="false">${i.font === "cut" ? cutHTML(i.text) : esc(i.text)}</span></div>`;
     } else if (i.kind === "scrap") {
       inner = i.type === "clip" ? `<span class="scrap sc-clip">${CLIP_SVG}</span>`
-        : `<div class="scrap sc-${i.type}"><span class="sctext" spellcheck="false" data-ph="${esc(SCRAP_HINT[i.type] || "")}">${esc(i.text || "")}</span></div>`;
+        : `<div class="scrap sc-${i.type}"><span class="sctext" spellcheck="false" data-hint="${esc(SCRAP_HINT[i.type] || "")}">${esc(i.text || "")}</span></div>`;
     } else if (i.kind === "tape") {
       inner = `<span class="ctape"></span>`;
     } else if (i.kind === "image") {
@@ -665,6 +665,7 @@ export async function mount(root, state) {
       boardEl.addEventListener("pointermove", onMove);
       boardEl.addEventListener("pointerup", onUp);
       boardEl.addEventListener("pointercancel", onCancel);
+      boardEl.addEventListener("click", () => { const d = editOnClick; editOnClick = null; if (d && d.el.isConnected) startTextEdit(d.el, d.it); });
       boardEl.addEventListener("touchmove", e => { if (drag) e.preventDefault(); }, { passive: false }); // once a drag starts, the page stops scrolling
       renderDecoBar();
     }
@@ -848,7 +849,7 @@ export async function mount(root, state) {
   // ---------- dragging ----------
   // On touch screens a finger that moves right away is scrolling, not picking.
   // A tap picks; holding still for a moment, then moving, drags.
-  let held = null;
+  let held = null, editOnClick = null;
   function onDown(e) {
     if (e.pointerType === "touch" && !e.target.closest(".h-rot, .h-del") && e.target.closest(".ci:not(.ci-add)")
         && e.target.closest(".ci").dataset.id !== selectedId // a piece you already picked drags right away
@@ -909,7 +910,7 @@ export async function mount(root, state) {
     if (held) { const f = held.fake; clearTimeout(held.timer); held = null; startDown(f); } // a quick tap still picks
     if (!drag) return;
     const d = drag; drag = null;
-    if (d.mode === "m" && !d.moved && d.wasSel && (d.it.kind === "text" || (d.it.kind === "scrap" && d.it.type !== "clip"))) startTextEdit(d.el, d.it);
+    if (d.mode === "m" && !d.moved && d.wasSel && (d.it.kind === "text" || (d.it.kind === "scrap" && d.it.type !== "clip"))) editOnClick = d; // opened by the click that follows
     fitBoard(); saveCollage();
   }
 
@@ -925,9 +926,9 @@ export async function mount(root, state) {
     const b = (attrs, label, pressed) => `<button ${attrs}${pressed != null ? ` aria-pressed="${!!pressed}"` : ""}>${label}</button>`;
     const opt = {
       scraps: () => SCRAPS.map(([k, n]) => b(`data-scrap="${k}"`, n)).join(""),
-      add: () => `${b('data-deco="text"', "Text")}${b('data-deco="tape" aria-label="Tape" title="Tape"', `<span class="tape-swatch"></span>`)}${b('data-deco="photo"', "Photo")}${b('data-deco="paste"', "Paste")}${b('data-deco="commons"', "Wikimedia")}`,
+      add: () => `${b('data-deco="text"', "Text")}${b('data-deco="photo"', "Photo")}${b('data-deco="paste"', "Paste")}${b('data-deco="commons"', "Wikimedia")}`,
       page: () => `<span class="group">${[["card", "Card"], ["kraft", "Kraft"], ["grid", "Grid"], ["album", "Album"]].map(([f, n]) => b(`data-paper="${f}" class="paper-btn pb-${f}"`, n, curPaper() === f)).join("")}</span>
-        <span class="group">${[["neat", "Neat"], ["loose", "Loose"]].map(([f, n]) => b(`data-look="${f}"`, n, lookNow() === f)).join("")}</span>${b('data-deco="tidy"', "Tidy up")}`,
+        ${b('data-deco="tidy"', "Tidy up")}`,
       style: () => `<span class="group">${[["hand", "Hand"], ["type", "Type"], ["press", "Press"], ["cut", "Cutout"]].map(([f, n]) => b(`data-tx="font" data-v="${f}" class="f-${f}"`, n, (it.font || "hand") === f)).join("")}</span>
         ${b('data-tx="tape" aria-label="Tape behind text"', `<span class="tape-swatch"></span>`, it.tape)}`,
       color: () => COLORS.map(c => b(`data-tx="color" data-v="${c}" class="dot" style="--c:${c}" aria-label="Color ${c}"`, "", (it.color || COLORS[0]) === c)).join(""),
@@ -1183,10 +1184,6 @@ export async function mount(root, state) {
         <div class="months">${months}</div>
 
         <section class="account keep" id="account">${accountHTML()}</section>
-        <div class="lookpick">
-          <span class="typed">Page look</span>
-          ${[["neat", "Neat grid"], ["loose", "Loose"]].map(([f, n]) => `<button class="chip" data-look="${f}" aria-pressed="${lookNow() === f}">${n}</button>`).join("")}
-        </div>
         <div class="keep">
           <p>${status}</p>
           <div class="row">${actions}</div>
