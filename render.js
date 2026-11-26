@@ -138,51 +138,32 @@ export async function renderDay(opt) {
   }
   groups.sort((a, b) => Math.abs(a.t - b.t) > 40 ? a.t - b.t : a.l - b.l); // page order
 
-  // justified rows: each row holds 1–3 groups at one shared height and spans the full width.
-  // Try every way to split the groups (in page order) into rows; keep the one that fills the screen
-  // with the biggest pictures and the most even rows.
-  const AW = W - 2 * M, AH = bottom - contentTop, gap = 10 * u;
-  const n = groups.length, aspect = groups.map(g => g.w / g.h);
-  const splits = [];
-  (function walk(i, acc) {
-    if (splits.length > 4000) return;
-    if (i === n) { splits.push(acc.slice()); return; }
-    for (let k = 1; k <= Math.min(3, n - i); k++) { acc.push(k); walk(i + k, acc); acc.pop(); }
-  })(0, []);
+  // even grid: every photo the same width, every gap the same, 1–5 per row.
+  // Use the fewest columns (biggest photos) whose rows still fit on the screen.
+  const AW = W - 2 * M, AH = bottom - contentTop, gap = 12 * u;
+  const pw = gr => (gr.members[0].it.kind === "photo" ? gr.members[0].w : gr.w); // the photo's own width sets the size
+  const layout = c => {
+    const cw = (AW - gap * (c - 1)) / c, rows = [];
+    for (let i = 0; i < groups.length; i += c) rows.push(groups.slice(i, i + c));
+    const rowH = rows.map(r => Math.max(...r.map(g => g.h * cw / pw(g))));
+    return { c, cw, rows, rowH, total: rowH.reduce((a, b) => a + b, 0) + gap * (rows.length - 1) };
+  };
   let plan = null;
-  for (const sp of splits) {
-    let i = 0; const rows = [];
-    for (const k of sp) {
-      const idx = groups.slice(i, i + k), sumA = aspect.slice(i, i + k).reduce((a, b) => a + b, 0);
-      rows.push({ items: idx, h: (AW - gap * (k - 1)) / sumA, sumA }); i += k;
-    }
-    // no row may be much taller than the others (a lone photo would otherwise fill the whole width)
-    const minH = Math.min(...rows.map(r => r.h));
-    rows.forEach(r => { r.h = Math.min(r.h, minH * 1.25, AW * .62 / Math.max(.2, r.sumA / r.items.length)); });
-    const total = rows.reduce((a, r) => a + r.h, 0) + gap * (rows.length - 1);
-    const f = Math.min(1, (AH - gap * (rows.length - 1)) / (total - gap * (rows.length - 1)));
-    const hs = rows.map(r => r.h * f), mean = hs.reduce((a, b) => a + b, 0) / hs.length;
-    const spread = Math.sqrt(hs.reduce((a, h) => a + (h - mean) ** 2, 0) / hs.length) / mean; // 0 = all rows the same height
-    const filled = (hs.reduce((a, b) => a + b, 0) + gap * (rows.length - 1)) / AH;           // 1 = fills the screen
-    const widthUsed = rows.reduce((a, r) => a + Math.min(1, (r.h * f * r.sumA + gap * (r.items.length - 1)) / AW), 0) / rows.length;
-    const threes = sp.filter(k => k === 3).length / sp.length; // rows of three are the default look
-    const score = filled * widthUsed - .45 * spread + .25 * threes;
-    if (!plan || score > plan.score) plan = { rows, f, score };
-  }
-  const { rows, f } = plan;
-  const usedH = rows.reduce((a, r) => a + r.h * f, 0) + gap * (rows.length - 1);
-  let yy = contentTop + Math.max(0, (AH - usedH) / 2);
-  for (const r of rows) {
-    const rh = r.h * f, rowW = rh * r.sumA + gap * (r.items.length - 1);
-    let xx = M + (AW - rowW) / 2;
-    for (const g of r.items) {
-      g.s = rh / g.h;
-      g.ox = xx - g.l * g.s; g.oy = yy - g.t * g.s;
-      g.members.forEach(m => { m.s = g.s; m.ox = g.ox; m.oy = g.oy; });
-      xx += g.w * g.s + gap;
-    }
-    yy += rh + gap;
-  }
+  for (let c = 1; c <= 5; c++) { plan = layout(c); if (plan.total <= AH) break; }
+  const f = Math.min(1, AH / plan.total); // still too tall at 5 per row: shrink everything evenly
+  const cw = plan.cw * f, g2 = gap * f, gridW = plan.c * cw + g2 * (plan.c - 1);
+  const avgPW = groups.reduce((a, g) => a + pw(g), 0) / groups.length, ts = cw / avgPW; // one text size for every photo
+  let yy = contentTop + Math.max(0, (AH - plan.total * f) / 2);
+  plan.rows.forEach((r, ri) => {
+    r.forEach((g, ci) => {
+      const lead = g.members[0], colX = M + (AW - gridW) / 2 + ci * (cw + g2);
+      g.s = cw / pw(g);
+      g.ox = colX - (lead.it.kind === "photo" ? lead.l : g.l) * g.s;
+      g.oy = yy - g.t * g.s;
+      g.members.forEach(m => { m.s = g.s; m.ox = g.ox; m.oy = g.oy; m.ts = ts; });
+    });
+    yy += plan.rowH[ri] * f + g2;
+  });
 
   // the day's paper (kraft, grid notebook, black album) behind the photos and the note
   const paper = opt.paper || "card";
@@ -269,9 +250,10 @@ function drawPhoto(ctx, g, el, img, p, s, opt) {
     const cx = cap.offsetLeft * s, cy = cap.offsetTop * s, cw = cap.offsetWidth * s;
     const timeEl = cap.querySelector(".time"); let ty = cy + 2 * s;
     const album = opt.paper === "album" && kind !== "instant";
-    if (timeEl) { ctx.font = `${12 * s}px "Special Elite", monospace`; ctx.fillStyle = album ? "#A9A79E" : opt.paper === "kraft" && kind !== "instant" ? "#5E4B30" : PENCIL; ty += 12 * s; ctx.fillText(timeEl.textContent, cx + 4 * s, ty); ty += 4 * s; }
+    const t = g.ts || s; // same text size on every photo
+    if (timeEl) { ctx.font = `${12 * t}px "Special Elite", monospace`; ctx.fillStyle = album ? "#A9A79E" : opt.paper === "kraft" && kind !== "instant" ? "#5E4B30" : PENCIL; ty += 12 * t; ctx.fillText(timeEl.textContent, cx + 4 * s, ty); ty += 4 * t; }
     if (p.caption) {
-      const fs = Math.min(26, Math.max(16, g.w * .085)) * s;
+      const fs = 17 * t;
       ctx.font = `${fs}px "Caveat", "Nanum Pen Script", sans-serif`; ctx.fillStyle = album ? "#EEEBE2" : INK;
       wrapLines(ctx, p.caption, cw - 6 * s).forEach(t => { ty += fs * 1.15; ctx.fillText(t, cx + 4 * s, ty - fs * .2); });
     }

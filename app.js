@@ -1,4 +1,4 @@
-export const VERSION = "57"; // bump on every change; shown at the bottom of Archive
+export const VERSION = "58"; // bump on every change; shown at the bottom of Archive
 // diary — app code. Loaded (and hot-swapped) by index.html.
 // mount(root, state) draws the app and returns an unmount function.
 
@@ -1101,6 +1101,7 @@ export async function mount(root, state) {
     try {
       await flushText();
       const k = route().date, d = fromKey(k), isToday = k === todayKey();
+      dayPhotos = await store.photosOn(k); // notes typed since the page was drawn
       const { renderDay } = await import(`./render.js?v=${VERSION}`);
       const cv = await renderDay({
         boardEl, items: col.items, photos: photoMap(), assets, note: root.querySelector("#note")?.value || "",
