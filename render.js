@@ -129,7 +129,7 @@ export async function renderDay(opt) {
   ctx.restore();
 
   // ---- top: the date typed on a strip of masking tape; "Diary" pencilled in the corner ----
-  await document.fonts.load('40px "IM Fell English"').catch(() => {});
+  await document.fonts.load('40px "Homemade Apple"').catch(() => {});
   const M = P.x + 34 * u, innerR = P.x + P.w - 18 * u;
   ctx.font = `${17 * u}px "Special Elite", "Courier New", monospace`; ctx.textBaseline = "alphabetic";
   const dateTxt = `${titleSoft} ${titleMain}`, dW = ctx.measureText(dateTxt).width;
@@ -137,7 +137,7 @@ export async function renderDay(opt) {
   ctx.fillStyle = TAPE; ctx.shadowColor = "rgba(40,40,34,.18)"; ctx.shadowBlur = 3 * u; ctx.shadowOffsetY = 1 * u;
   ctx.fillRect(0, 0, dW + 34 * u, 30 * u); noShadow(ctx);
   ctx.fillStyle = INK; ctx.fillText(dateTxt, 17 * u, 21 * u); ctx.restore();
-  ctx.font = `${26 * u}px "IM Fell English", Georgia, serif`;
+  ctx.font = `${20 * u}px "Homemade Apple", "Caveat", cursive`;
   const dark = paper === "album" || paper === "navy";
   ctx.fillStyle = dark ? "rgba(238,235,226,.75)" : "rgba(36,35,31,.72)";
   ctx.save(); ctx.translate(innerR - ctx.measureText("Diary").width, P.y + 44 * u); ctx.rotate(3 * Math.PI / 180); ctx.fillText("Diary", 0, 0); ctx.restore();
