@@ -100,8 +100,7 @@ export async function renderDay(opt) {
   pagePath.moveTo(P.x + 4 * u, P.y);
   pagePath.lineTo(P.x + P.w, P.y + 1 * u); pagePath.lineTo(P.x + P.w - 1 * u, P.y + P.h); pagePath.lineTo(P.x + 3 * u, P.y + P.h - 1 * u);
   for (let ty = P.y + P.h; ty > P.y; ty -= 4 * u + rand() * 5 * u) {           // ragged torn edge, nicking the punch holes
-    const nearHole = holes.some(hh => Math.abs(hh - ty) < 7 * u);
-    pagePath.lineTo(P.x + (nearHole ? 14 * u : 0) + rand() * 5 * u, ty);
+    pagePath.lineTo(P.x + (rand() < .12 ? 5 * u : 0) + rand() * 5 * u, ty);
   }
   pagePath.closePath();
   ctx.save();
@@ -127,14 +126,10 @@ export async function renderDay(opt) {
   }
   ctx.fillStyle = grainPattern(ctx, u * .6); ctx.fillRect(P.x, P.y, P.w, P.h);
   ctx.restore();
-  holes.forEach(hy => { // punch holes, showing the table through
-    ctx.beginPath(); ctx.arc(holeX, hy, 5 * u, 0, 7); ctx.fillStyle = "#BDB4A2"; ctx.fill();
-    ctx.strokeStyle = "rgba(30,24,14,.25)"; ctx.lineWidth = 1 * u; ctx.stroke();
-  });
 
   // ---- top: the date typed on a strip of masking tape; "Diary" pencilled in the corner ----
   await document.fonts.load('40px "IM Fell English"').catch(() => {});
-  const M = P.x + 30 * u, innerR = P.x + P.w - 18 * u;
+  const M = P.x + 34 * u, innerR = P.x + P.w - 18 * u;
   ctx.font = `${17 * u}px "Special Elite", "Courier New", monospace`; ctx.textBaseline = "alphabetic";
   const dateTxt = `${titleSoft} ${titleMain}`, dW = ctx.measureText(dateTxt).width;
   ctx.save(); ctx.translate(M - 6 * u, P.y + 26 * u); ctx.rotate(-2.2 * Math.PI / 180);
@@ -166,6 +161,10 @@ export async function renderDay(opt) {
     const g = { it, el, x: el.offsetLeft, y: el.offsetTop, w: el.offsetWidth, h: el.offsetHeight, rot: it.kind === "photo" ? 0 : (it.rot || 0), z: it.z || 1 }; // photos start straight; the album layout tilts them
     const rad = Math.abs(g.rot) * Math.PI / 180, bw = g.w * Math.cos(rad) + g.h * Math.sin(rad), bh = g.w * Math.sin(rad) + g.h * Math.cos(rad);
     g.l = g.x + g.w / 2 - bw / 2; g.r = g.x + g.w / 2 + bw / 2; g.t = g.y + g.h / 2 - bh / 2; g.b = g.y + g.h / 2 + bh / 2;
+    if (it.kind === "photo") { // only what shows: an empty caption box takes no room in the picture
+      const fr = el.querySelector(".frame"), cap = el.querySelector(".cap"), txt = el.querySelector(".caption")?.value?.trim();
+      if (fr && cap) g.b = g.y + Math.max(fr.offsetTop + fr.offsetHeight, cap.offsetTop + (txt ? cap.offsetHeight : 20));
+    }
     return g;
   }).filter(Boolean);
   if (!geo.length) return cv;
@@ -196,21 +195,21 @@ export async function renderDay(opt) {
 
   // a loose album layout: balanced rows as a starting point, then every photo nudged, turned and
   // resized a little, so they overlap here and there like prints stuck down by hand
-  const AX = M - 8 * u, AW = innerR - AX, AH = bottom - contentTop, gap = 10 * u;
+  const AX = M - 4 * u, AW = innerR + 6 * u - AX, AH = bottom - contentTop, gap = 6 * u;
   const pw = gr => (gr.members[0].it.kind === "photo" ? gr.members[0].w : gr.w);
   const layout = c => {
     const cw = (AW - gap * (c - 1)) / c, rows = [];
     const nRows = Math.ceil(groups.length / c), per = Math.ceil(groups.length / nRows);
     for (let i = 0; i < groups.length; i += per) rows.push(groups.slice(i, i + per));
-    const rowH = rows.map(r => Math.max(...r.map(g => g.h * cw / pw(g))));
+    const rowH = rows.map(r => Math.max(...r.map(g => (g.b - g.t) * cw / pw(g))));
     return { c, cw, rows, rowH, total: rowH.reduce((a, b) => a + b, 0) + gap * (rows.length - 1) };
   };
   let plan = null, best = 0;
   for (let c = 1; c <= Math.min(5, groups.length); c++) {
-    const L = layout(c), size = L.cw * Math.min(1, AH / (L.total * .9));
+    const L = layout(c), size = L.cw * Math.min(1.12, AH / (L.total * .96));
     if (size > best) { best = size; plan = L; }
   }
-  const f = Math.min(1, AH / (plan.total * .9)); // rows may overlap a little, so they can sit a bit bigger
+  const f = Math.min(1.12, AH / (plan.total * .96)); // photos may overlap a little
   const cw = plan.cw * f, g2 = gap * f;
   const avgPW = groups.reduce((a, g) => a + pw(g), 0) / groups.length, ts = cw / avgPW;
   const rowGap = (AH - plan.rowH.reduce((a, b) => a + b * f, 0)) / Math.max(1, plan.rows.length); // spread rows over the page
@@ -218,15 +217,20 @@ export async function renderDay(opt) {
   plan.rows.forEach((r, ri) => {
     const rowW = r.length * cw + g2 * (r.length - 1);
     r.forEach((g, ci) => {
-      const lead = g.members[0], k = .84 + rand() * .26;          // a little bigger or smaller
-      const colX = AX + (AW - rowW) / 2 + ci * (cw + g2) + (rand() - .5) * cw * .3;
+      const lead = g.members[0], k = .92 + rand() * .2;          // a little bigger or smaller
+      let colX = AX + (AW - rowW) / 2 + ci * (cw + g2) + (rand() - .5) * cw * .3;
+      { // keep clear of the torn edge (so writing under a photo stays readable) and of the right edge
+        const sw = cw * k, tilt = (g.b - g.t) * cw / pw(g) * k * .09, left = colX + cw * (1 - k) / 2;
+        const minL = P.x + 26 * u + tilt, maxR = P.x + P.w - 12 * u - tilt;
+        if (left < minL) colX += minL - left; else if (left + sw > maxR) colX -= left + sw - maxR;
+      }
       const rowY = yy + (rand() - .5) * plan.rowH[ri] * f * .2;
       g.s = cw / pw(g) * k;
       g.ox = colX + cw * (1 - k) / 2 - (lead.it.kind === "photo" ? lead.l : g.l) * g.s;
       g.oy = rowY - g.t * g.s;
       const rot = (rand() < .5 ? -1 : 1) * (2 + rand() * 6.5), cx = g.ox + (g.l + g.r) / 2 * g.s, cy = g.oy + (g.t + g.b) / 2 * g.s;
-      const zb = rand(), corners = rand() < .4;
-      g.members.forEach(m => { m.s = g.s; m.ox = g.ox; m.oy = g.oy; m.ts = ts; m.grot = rot; m.gcx = cx; m.gcy = cy; m.zb = zb; m.corners = corners; });
+      const zb = (plan.rows.length - ri) + rand() * .9, corners = rand() < .4, cornerPair = rand() < .5;
+      g.members.forEach(m => { m.s = g.s; m.ox = g.ox; m.oy = g.oy; m.ts = ts; m.grot = rot; m.gcx = cx; m.gcy = cy; m.zb = zb; m.corners = corners; m.cornerPair = cornerPair; });
     });
     yy += plan.rowH[ri] * f + rowGap;
   });
@@ -292,14 +296,18 @@ function drawPhoto(ctx, g, el, img, p, s, opt) {
   ctx.fillStyle = "#1d1e1b"; ctx.fillRect(px, py, pw, phh);
   if (img) drawCover(ctx, img, px, py, pw, phh, it.look);
   // tape
-  if (g.corners && kind !== "film") { // black photo corners holding the print
-    ctx.fillStyle = (opt.paper === "album" || opt.paper === "navy") ? "#D9D3C2" : "#24231F"; const c = Math.min(fw, fh) * .14, o = 3 * s;
-    for (const [x0, y0, dx, dy] of [[fx - o, fy - o, 1, 1], [fx + fw + o, fy - o, -1, 1], [fx - o, fy + fh + o, 1, -1], [fx + fw + o, fy + fh + o, -1, -1]]) {
-      ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0 + dx * c, y0); ctx.lineTo(x0, y0 + dy * c); ctx.closePath(); ctx.fill();
-    }
+  // what gets taped or cornered: the whole card for an instant print, the print itself otherwise
+  const [bx, by, bw, bh] = kind === "instant" ? [0, 0, g.w * s, g.h * s] : [fx, fy, fw, fh];
+  if (g.corners && kind !== "film") { // two big photo corners on opposite corners
+    ctx.fillStyle = (opt.paper === "album" || opt.paper === "navy") ? "#D9D3C2" : "#24231F";
+    const c = Math.min(bw, bh) * .3, o = 2 * s;
+    const pairs = g.cornerPair ? [[bx + bw + o, by - o, -1, 1], [bx - o, by + bh + o, 1, -1]] : [[bx - o, by - o, 1, 1], [bx + bw + o, by + bh + o, -1, -1]];
+    ctx.save(); ctx.shadowColor = "rgba(30,25,15,.3)"; ctx.shadowBlur = 2 * s; ctx.shadowOffsetY = .8 * s;
+    for (const [x0, y0, dx, dy] of pairs) { ctx.beginPath(); ctx.moveTo(x0, y0); ctx.lineTo(x0 + dx * c, y0); ctx.lineTo(x0, y0 + dy * c); ctx.closePath(); ctx.fill(); }
+    ctx.restore();
   } else if (kind !== "film") {
     const tx = parseFloat(el.style.getPropertyValue("--tape-x")) / 100 || .5, tr = parseFloat(el.style.getPropertyValue("--tape-r")) || -3;
-    tapeRect(ctx, g.w * s * tx, fy + 1 * s, g.w * s * .42, 16 * s, tr);
+    tapeRect(ctx, bx + bw * tx, by + 1 * s, bw * .42, 16 * s, tr);
   }
   // time + note
   if (cap && p) {
