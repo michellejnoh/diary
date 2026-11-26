@@ -1,4 +1,4 @@
-export const VERSION = "78"; // bump on every change; shown at the bottom of Archive
+export const VERSION = "79"; // bump on every change; shown at the bottom of Archive
 // diary — app code. Loaded (and hot-swapped) by index.html.
 // mount(root, state) draws the app and returns an unmount function.
 
