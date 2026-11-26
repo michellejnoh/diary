@@ -945,3 +945,19 @@ header.top .barin::before { content: ""; position: absolute; left: -50vw; right:
 /* bigger profile seal */
 .me { width: 40px; height: 40px; }
 .me span { width: 31px; height: 31px; font-size: 16px; border-width: 2px; }
+
+/* ---------- the day's paper is the whole page ---------- */
+.pagewrap::before { display: none; }
+body[data-paper] { background-size: auto; background-repeat: repeat; }
+body[data-paper="cream"] { background-color: #EFE6D2; background-image: var(--grain), var(--mottle); background-blend-mode: multiply; }
+body[data-paper="kraft"] { background-color: #C4A57A; background-image: var(--grain), var(--mottle); background-blend-mode: multiply; }
+body[data-paper="blush"] { background-color: #E8D4CC; background-image: var(--grain), var(--mottle); background-blend-mode: multiply; }
+body[data-paper="sage"]  { background-color: #C6CFBA; background-image: var(--grain), var(--mottle); background-blend-mode: multiply; }
+body[data-paper="grid"]  { background-color: #F3F1EA; background-image: linear-gradient(rgba(80,110,150,.2) 1px, transparent 1px), linear-gradient(90deg, rgba(80,110,150,.2) 1px, transparent 1px), var(--grain-even); background-size: 22px 22px, 22px 22px, auto; background-blend-mode: normal, normal, soft-light; }
+body[data-paper="dots"]  { background-color: #F4F1E9; background-image: radial-gradient(rgba(80,90,100,.32) 1.1px, transparent 1.4px), var(--grain); background-size: 18px 18px, auto; background-blend-mode: normal, multiply; }
+body[data-paper="lined"] { background-color: #F7F5EE; background-image: linear-gradient(90deg, transparent 34px, rgba(205,90,80,.45) 34px, rgba(205,90,80,.45) 35.5px, transparent 35.5px), repeating-linear-gradient(transparent 0 27px, rgba(80,110,150,.24) 27px 28px), var(--grain); background-size: auto, auto, auto; background-blend-mode: normal, normal, multiply; }
+body[data-paper="album"] { background-color: #23221F; background-image: var(--grain); background-blend-mode: screen; }
+body[data-paper="navy"]  { background-color: #222B3B; background-image: var(--grain); background-blend-mode: screen; }
+body[data-paper="album"] .nudge, body[data-paper="navy"] .nudge,
+body[data-paper="album"] .nudge .link, body[data-paper="navy"] .nudge .link,
+body[data-paper="album"] .daysub .hint, body[data-paper="navy"] .daysub .hint { color: #CFCBBF; }

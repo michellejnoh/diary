@@ -1,4 +1,4 @@
-export const VERSION = "75"; // bump on every change; shown at the bottom of Archive
+export const VERSION = "76"; // bump on every change; shown at the bottom of Archive
 // diary — app code. Loaded (and hot-swapped) by index.html.
 // mount(root, state) draws the app and returns an unmount function.
 
@@ -288,6 +288,8 @@ function setBarColor(color) { // Safari top and bottom bars
   if (!m) { m = document.createElement("meta"); m.name = "theme-color"; document.head.append(m); }
   m.content = color;
 }
+// the chosen paper becomes the whole page's background
+const bodyPaper = p => { if (p && p !== "card") document.body.dataset.paper = p; else delete document.body.dataset.paper; };
 const CARD = "#EAE3D3", DARK = "#1A1A17";
 
 // =====================================================================
@@ -502,6 +504,7 @@ export async function mount(root, state) {
     const hrefOf = k2 => k2 === todayKey() ? "#/" : `#/day/${k2}`;
     state.navDir = null;
     const paper = day.paper || defPaper();
+    bodyPaper(paper);
     const title = `<span class="sr">${isToday ? "Today, " : WEEKDAYS[d.getDay()] + ", "}</span>${d.getDate()} ${MONTHS[d.getMonth()].slice(0, 3).toUpperCase()} ${d.getFullYear()}`; // like an office date stamp
 
     root.innerHTML = `
@@ -1088,6 +1091,7 @@ export async function mount(root, state) {
     if (record && v !== paperNow) checkpoint();
     paperNow = v;
     const pw = root.querySelector("#pagewrap"); if (pw) pw.className = paperClass(v);
+    bodyPaper(v);
     await store.patchDay(colKey, { paper: v === defPaper() ? undefined : v }); changed();
     renderDecoBar();
   }
@@ -1207,6 +1211,7 @@ export async function mount(root, state) {
 
   // ---------- archive page ----------
   async function renderArchive() {
+    bodyPaper(null);
     const sum = await store.summary();
     const dates = Object.keys(sum).sort();
     const now = new Date(), tKey = todayKey();
@@ -1267,6 +1272,7 @@ export async function mount(root, state) {
       ${u?.email ? `<p class="kc-mail">${esc(u.email)}</p>` : ""}`;
   }
   async function renderMe() {
+    bodyPaper(null);
     const sum = await store.summary(), keys = Object.keys(sum).sort();
     meStats = { since: keys[0] || null, days: keys.length, photos: keys.reduce((n, k) => n + sum[k].count, 0) };
     const lb = ls.get(LAST_BACKUP);
