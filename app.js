@@ -1,4 +1,4 @@
-export const VERSION = "67"; // bump on every change; shown at the bottom of Archive
+export const VERSION = "68"; // bump on every change; shown at the bottom of Archive
 // diary — app code. Loaded (and hot-swapped) by index.html.
 // mount(root, state) draws the app and returns an unmount function.
 
@@ -484,15 +484,13 @@ export async function mount(root, state) {
     const hrefOf = k2 => k2 === todayKey() ? "#/" : `#/day/${k2}`;
     state.navDir = null;
     const paper = day.paper || "card";
-    const title = isToday
-      ? `<span class="soft">Today,</span> ${d.getDate()} ${MONTHS[d.getMonth()]}`
-      : `<span class="soft">${WEEKDAYS[d.getDay()]},</span> <span class="nw">${d.getDate()} ${MONTHS[d.getMonth()]}${d.getFullYear() !== new Date().getFullYear() ? " " + d.getFullYear() : ""}</span>`;
+    const title = `<span class="sr">${isToday ? "Today, " : WEEKDAYS[d.getDay()] + ", "}</span>${d.getDate()} ${MONTHS[d.getMonth()].slice(0, 3).toUpperCase()} ${d.getFullYear()}`; // like an office date stamp
 
     root.innerHTML = `
       <div class="wrap${editing ? " decorating" : ""}">
         <header class="top"><div class="barin topstack">
           <a class="wordmark bigmark" href="#/">Diary</a>
-          <div class="daterow"><h1 class="page-title day-title big-date">${title}</h1></div>
+          <div class="daterow"><h1 class="page-title day-title big-date datestamp">${title}</h1></div>
         </div></header>
         ${editing ? `<div class="dayhead"><div class="daysub"><span class="hint typed">Drag to move. Corner handle turns and resizes.</span></div></div>` : ""}
         <div class="${paperClass(paper)}" id="pagewrap">
@@ -1240,7 +1238,7 @@ export async function mount(root, state) {
       <div class="wrap">
         <header class="top"><div class="barin topstack">
           <a class="wordmark bigmark" href="#/">Diary</a>
-          <div class="daterow"><h1 class="page-title day-title big-date">Archive</h1></div>
+          <div class="daterow"><h1 class="page-title day-title big-date datestamp">ARCHIVE</h1></div>
         </div></header>
         <p class="summary">${photoTotal ? `${photoTotal} photo${photoTotal > 1 ? "s" : ""} over ${dates.length} day${dates.length > 1 ? "s" : ""}` : "Nothing here yet."}</p>
         <div class="months">${months}</div>

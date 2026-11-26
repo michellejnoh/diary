@@ -807,14 +807,13 @@ header.top::after, .botbar::after {
 header.top::after { right: 16%; bottom: -15px; transform: rotate(-5deg); }
 .botbar::after { left: 12%; top: -15px; transform: rotate(3deg); }
 
-/* the date: stamped in red ink */
-header.top .daterow .page-title.day-title.big-date {
-  color: #B0372B; border: 2px solid currentColor; text-shadow: 0 0 .5px currentColor, .3px 0 0 currentColor; border-radius: 3px; padding: 3px 9px 1px;
-  transform: rotate(-1.6deg); transform-origin: left center; margin-top: 2px;
-  -webkit-mask-image: var(--ink-wear); mask-image: var(--ink-wear); -webkit-mask-size: 140px; mask-size: 140px;
+/* the date: an office date stamp in red ink, pressed a little unevenly */
+@font-face { font-family: "Stamp"; src: url("fonts/oswald-stamp.woff2?v=1") format("woff2"); font-display: swap; }
+header.top .daterow .page-title.datestamp {
+  display: inline-block; color: #A8342A; font: 600 clamp(18px, 5.4vw, 22px)/1 "Stamp", "Arial Narrow", sans-serif; letter-spacing: .09em;
+  transform: rotate(-2.5deg); transform-origin: left center; margin: 6px 0 2px; mix-blend-mode: multiply; filter: url(#ink);
+  -webkit-mask-image: linear-gradient(97deg, rgba(0,0,0,.5), #000 35%, #000 70%, rgba(0,0,0,.72)); mask-image: linear-gradient(97deg, rgba(0,0,0,.5), #000 35%, #000 70%, rgba(0,0,0,.72));
 }
-header.top .daterow .page-title.day-title .soft { color: inherit; opacity: .8; }
-
 /* an empty day: a blank print waiting for a photo */
 .add-tile {
   background: linear-gradient(var(--card-deep), var(--card-deep)) content-box, var(--paper); padding: 7px 7px 9px;
