@@ -961,3 +961,12 @@ body[data-paper="navy"]  { background-color: #222B3B; background-image: var(--gr
 body[data-paper="album"] .nudge, body[data-paper="navy"] .nudge,
 body[data-paper="album"] .nudge .link, body[data-paper="navy"] .nudge .link,
 body[data-paper="album"] .daysub .hint, body[data-paper="navy"] .daysub .hint { color: #CFCBBF; }
+
+/* Archive and Profile sit on your paper too; on the dark papers their writing turns light */
+body[data-paper="album"] .plainpage, body[data-paper="navy"] .plainpage { --ink: #EEEBE2; --pencil: #B9B5AA; color: var(--ink); }
+body[data-paper="album"] .plainpage .mecard, body[data-paper="navy"] .plainpage .mecard,
+body[data-paper="album"] .plainpage .font-opt, body[data-paper="navy"] .plainpage .font-opt { --ink: #2C2B27; --pencil: #67695F; }
+body[data-paper="album"] .plainpage .font-opt:not([aria-pressed="true"]), body[data-paper="navy"] .plainpage .font-opt:not([aria-pressed="true"]) { background: rgba(247,245,239,.75); }
+body[data-paper="album"] .plainpage .chip, body[data-paper="navy"] .plainpage .chip { color: #EEEBE2; border-color: rgba(238,235,226,.4); }
+body[data-paper="kraft"] .plainpage, body[data-paper="sage"] .plainpage, body[data-paper="blush"] .plainpage { --pencil: #4E4636; }
+body[data-paper="kraft"] .plainpage .mecard, body[data-paper="kraft"] .plainpage .font-opt { --pencil: #67695F; }

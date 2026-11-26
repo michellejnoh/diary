@@ -1,4 +1,4 @@
-export const VERSION = "76"; // bump on every change; shown at the bottom of Archive
+export const VERSION = "77"; // bump on every change; shown at the bottom of Archive
 // diary — app code. Loaded (and hot-swapped) by index.html.
 // mount(root, state) draws the app and returns an unmount function.
 
@@ -1211,7 +1211,7 @@ export async function mount(root, state) {
 
   // ---------- archive page ----------
   async function renderArchive() {
-    bodyPaper(null);
+    bodyPaper(defPaper());
     const sum = await store.summary();
     const dates = Object.keys(sum).sort();
     const now = new Date(), tKey = todayKey();
@@ -1241,7 +1241,7 @@ export async function mount(root, state) {
     }
 
     root.innerHTML = `
-      <div class="wrap">
+      <div class="wrap plainpage">
         <header class="top"><div class="barin topstack">
           <a class="wordmark bigmark" href="#/">Diary</a>${meButton()}
           <div class="daterow"><h1 class="page-title day-title big-date datestamp">ARCHIVE</h1></div>
@@ -1272,7 +1272,7 @@ export async function mount(root, state) {
       ${u?.email ? `<p class="kc-mail">${esc(u.email)}</p>` : ""}`;
   }
   async function renderMe() {
-    bodyPaper(null);
+    bodyPaper(defPaper());
     const sum = await store.summary(), keys = Object.keys(sum).sort();
     meStats = { since: keys[0] || null, days: keys.length, photos: keys.reduce((n, k) => n + sum[k].count, 0) };
     const lb = ls.get(LAST_BACKUP);
@@ -1296,7 +1296,7 @@ export async function mount(root, state) {
     const { ko, en } = fontsNow();
     const fontBtns = (list, lang, cur, sample) => list.map(f => `<button class="font-opt" data-font="${f.key}" data-lang="${lang}" aria-pressed="${f.key === cur.key}"><span class="sample" style="font-family:'${f.family}'">${sample}</span><span class="name">${esc(f.name)}</span></button>`).join("");
     root.innerHTML = `
-      <div class="wrap">
+      <div class="wrap plainpage">
         <header class="top"><div class="barin topstack">
           <a class="wordmark bigmark" href="#/">Diary</a>${meButton()}
           <div class="daterow"><h1 class="page-title day-title big-date datestamp">PROFILE</h1></div>
@@ -1513,6 +1513,7 @@ export async function mount(root, state) {
     else if (t.dataset.pick) pickCommons(t);
     else if (t.dataset.defpaper) {
       try { localStorage.setItem("diary.paper", t.dataset.defpaper); } catch {}
+      bodyPaper(t.dataset.defpaper);
       root.querySelectorAll("[data-defpaper]").forEach(b => b.setAttribute("aria-pressed", String(b === t)));
     }
     else if (t.dataset.font) {
