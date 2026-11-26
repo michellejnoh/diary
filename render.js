@@ -66,6 +66,8 @@ function drawCover(ctx, img, x, y, w, h, look) {
   ctx.filter = "none";
 }
 
+export const PAPER_FILL = { card: "#EEE9DC", kraft: "#C4A57A", grid: "#F3F1EA", album: "#23221F", cream: "#EFE6D2", blush: "#E8D4CC", sage: "#C6CFBA", dots: "#F4F1E9", lined: "#F7F5EE", navy: "#222B3B" };
+
 export async function renderDay(opt) {
   const { boardEl, items, photos, assets, note, titleSoft, titleMain, colors } = opt;
   await Promise.all([
@@ -92,7 +94,6 @@ export async function renderDay(opt) {
 
   // ---- the album page, torn out along its binding ----
   const paper = opt.paper || "card";
-  const PAPER_FILL = { card: "#EEE9DC", kraft: "#C4A57A", grid: "#F3F1EA", album: "#23221F", cream: "#EFE6D2", blush: "#E8D4CC", sage: "#C6CFBA", dots: "#F4F1E9", lined: "#F7F5EE", navy: "#222B3B" };
   const P = { x: 30 * u, y: 16 * u, w: W - 44 * u, h: H - 32 * u };
   const holeX = P.x + 9 * u, holes = [];
   for (let hy = P.y + 26 * u; hy < P.y + P.h - 16 * u; hy += 34 * u) holes.push(hy);

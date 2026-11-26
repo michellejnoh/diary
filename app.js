@@ -1,4 +1,4 @@
-export const VERSION = "63"; // bump on every change; shown at the bottom of Archive
+export const VERSION = "64"; // bump on every change; shown at the bottom of Archive
 // diary — app code. Loaded (and hot-swapped) by index.html.
 // mount(root, state) draws the app and returns an unmount function.
 
@@ -444,7 +444,7 @@ export async function mount(root, state) {
     const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (flip && !reduce && r.page === "day") {
       root.style.minHeight = Math.max(oldH, root.scrollHeight) + "px";
-      root.querySelectorAll(".dayhead, .pagewrap").forEach(el => el.classList.add(`slide-${flip}`));
+      root.querySelectorAll(".daterow, .pagewrap").forEach(el => el.classList.add(`slide-${flip}`));
       if (scrollY > 0) window.scrollTo({ top: 0, behavior: "smooth" }); // glide up while it slides, so the release can't jump
       const release = () => { if (scrollY > 2) return setTimeout(release, 60); root.style.minHeight = ""; old.forEach(URL.revokeObjectURL); };
       setTimeout(release, 380);
@@ -490,16 +490,11 @@ export async function mount(root, state) {
 
     root.innerHTML = `
       <div class="wrap${editing ? " decorating" : ""}">
-        <header class="top"><div class="barin">
+        <header class="top"><div class="barin topstack">
           <a class="wordmark bigmark" href="#/">Diary</a>
-          <a class="navtag" href="#/archive">Archive</a>
+          <div class="daterow"><h1 class="page-title day-title big-date">${title}</h1></div>
         </div></header>
-        <div class="dayhead">
-          <div class="daterow">
-            <h1 class="page-title day-title big-date">${title}</h1>
-          </div>
-          ${editing ? `<div class="daysub"><span class="hint typed">Drag to move. Corner handle turns and resizes.</span></div>` : ""}
-        </div>
+        ${editing ? `<div class="dayhead"><div class="daysub"><span class="hint typed">Drag to move. Corner handle turns and resizes.</span></div></div>` : ""}
         <div class="${paperClass(paper)}" id="pagewrap">
         <div class="board${editing ? " editing" : ""}" id="board"></div>
         <div class="slip">
@@ -515,6 +510,7 @@ export async function mount(root, state) {
           <a class="daynav" href="${hrefOf(prevK)}" data-nav="prev" aria-label="Previous day">‹</a>
           <button class="barbtn" data-decorate>Decorate</button>
           <button class="barbtn" data-saveimg>Save image</button>
+          <a class="barbtn" href="#/archive">Archive</a>
           ${isToday ? `<span class="daynav off" aria-hidden="true">›</span>` : `<a class="daynav" href="${hrefOf(nextK)}" data-nav="next" aria-label="Next day">›</a>`}
         </div>
       </nav>`}
@@ -1146,7 +1142,7 @@ export async function mount(root, state) {
       await flushText();
       const k = route().date, d = fromKey(k), isToday = k === todayKey();
       dayPhotos = await store.photosOn(k); // notes typed since the page was drawn
-      const { renderDay } = await import(`./render.js?v=${VERSION}`);
+      const { renderDay, PAPER_FILL } = await import(`./render.js?v=${VERSION}`);
       const cv = await renderDay({
         boardEl, items: col.items, photos: photoMap(), assets, note: root.querySelector("#note")?.value || "",
         titleSoft: isToday ? "Today," : `${WEEKDAYS[d.getDay()]},`,
@@ -1155,21 +1151,22 @@ export async function mount(root, state) {
       });
       const blob = await new Promise(r => cv.toBlob(r, "image/png"));
       const name = `diary-${k}.png`;
-      showTornPage(new File([blob], name, { type: "image/png" }));
+      showTornPage(new File([blob], name, { type: "image/png" }), PAPER_FILL[curPaper()] || PAPER_FILL.card);
     } catch (err) {
       console.error(err); alert("The picture couldn’t be made. Try again.");
     } finally { btn.textContent = label; btn.disabled = false; }
   }
 
   // the page tears out of the album, then waits for Save (so the tap can open the share sheet)
-  function showTornPage(file) {
+  function showTornPage(file, paperColor) {
     const url = URL.createObjectURL(file);
     const ov = document.createElement("div");
     ov.className = "tearbox";
     ov.innerHTML = `
       <div class="tear-album">
-        <div class="tear-spine">${"<i></i>".repeat(12)}</div>
         <div class="tear-page"><img src="${url}" alt="Your day as an album page"></div>
+        <div class="tear-stub" style="--pc:${paperColor}"></div>
+        <div class="tear-spine">${"<i></i>".repeat(12)}</div>
       </div>
       <div class="tear-actions"><button class="link" data-tclose>Close</button><button class="tear-save" data-tsave>Save</button></div>`;
     document.body.append(ov);
@@ -1241,11 +1238,10 @@ export async function mount(root, state) {
 
     root.innerHTML = `
       <div class="wrap">
-        <header class="top"><div class="barin">
+        <header class="top"><div class="barin topstack">
           <a class="wordmark bigmark" href="#/">Diary</a>
-          <a class="navtag" href="#/">Today</a>
+          <div class="daterow"><h1 class="page-title day-title big-date">Archive</h1></div>
         </div></header>
-        <h1 class="page-title day-title big-date archive-title">Archive</h1>
         <p class="summary">${photoTotal ? `${photoTotal} photo${photoTotal > 1 ? "s" : ""} over ${dates.length} day${dates.length > 1 ? "s" : ""}` : "Nothing here yet."}</p>
         <div class="months">${months}</div>
 
@@ -1259,7 +1255,8 @@ export async function mount(root, state) {
           </div>
         </div>
         <p class="version typed">version ${VERSION}</p>
-      </div>`;
+      </div>
+      <nav class="botbar" aria-label="Pages"><div class="barin"><a class="barbtn" href="#/">Today</a></div></nav>`;
     window.scrollTo(0, state.scroll?.[location.hash] || 0);
   }
 
