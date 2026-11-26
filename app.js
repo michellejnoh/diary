@@ -1,4 +1,4 @@
-export const VERSION = "72"; // bump on every change; shown at the bottom of Archive
+export const VERSION = "74"; // bump on every change; shown at the bottom of Archive
 // diary — app code. Loaded (and hot-swapped) by index.html.
 // mount(root, state) draws the app and returns an unmount function.
 
@@ -441,7 +441,7 @@ export async function mount(root, state) {
     root.style.minHeight = oldH + "px"; // hold the page height so nothing jumps while swapping
     const flip = state.navDir;
     const r = route();
-    if (r.page === "archive") await renderArchive(); else if (r.page === "me") renderMe(); else await renderDay(r.date);
+    if (r.page === "archive") await renderArchive(); else if (r.page === "me") await renderMe(); else await renderDay(r.date);
     if (state.viewer && r.page === "day") openViewer(state.viewer, false);
     const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (flip && !reduce && r.page === "day") {
@@ -466,11 +466,9 @@ export async function mount(root, state) {
   }
   // the little round account button in the top bar
   function meButton() {
-    const u = cloudStatus?.user;
-    const inner = u?.photo ? `<img src="${esc(u.photo)}" alt="" referrerpolicy="no-referrer">`
-      : u?.name ? `<span>${esc(u.name.trim()[0].toUpperCase())}</span>`
-      : `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="9" r="3.6"/><path d="M5 20c1.2-3.6 4-5.4 7-5.4s5.8 1.8 7 5.4" stroke-linecap="round"/></svg>`;
-    return `<a class="me" href="#/me" aria-label="Your account and settings">${inner}</a>`;
+    // a little paper seal with your initial stamped in red
+    const u = cloudStatus?.user, ini = (u?.name || "").trim()[0]?.toUpperCase() || "D";
+    return `<a class="me" href="#/me" aria-label="Your account and settings"><span>${esc(ini)}</span></a>`;
   }
   function backupLine() {
     if (cloudStatus?.user) return "";
@@ -556,7 +554,7 @@ export async function mount(root, state) {
     const row = r => {
       while (rows.length <= r) {
         const i = rows.length, top = i ? rows[i - 1].top + rows[i - 1].h : .03;
-        const scales = Array.from({ length: cols }, (_, c) => .8 + rnd(i * 7 + c, 1) * .42);
+        const scales = Array.from({ length: cols }, (_, c) => .93 + rnd(i * 7 + c, 1) * .14); // nearly the same size, so no photo ends up noticeably small
         const gaps = Array.from({ length: cols - 1 }, (_, c) => -.012 + rnd(i * 7 + c, 2) * .06);
         const total = scales.reduce((a, b) => a + b, 0), room = .97 - gaps.reduce((a, b) => a + b, 0);
         const ws = scales.map(v => v / total * room);
@@ -1243,12 +1241,24 @@ export async function mount(root, state) {
 
 
   // ---------- account and settings ----------
+  // a diary keeper's card, typed in: no account photo
+  let meStats = null;
   function meCardHTML() {
-    const u = cloudStatus?.user;
-    return `<div class="mepic">${u?.photo ? `<img src="${esc(u.photo)}" alt="" referrerpolicy="no-referrer">` : `<span>${esc((u?.name || "D").trim()[0].toUpperCase())}</span>`}</div>
-      <div><p class="mename">${esc(u?.name || "Your diary")}</p>${u?.email ? `<p class="memail">${esc(u.email)}</p>` : `<p class="memail">Not signed in</p>`}</div>`;
+    const u = cloudStatus?.user, st = meStats || { since: null, days: 0, photos: 0 };
+    const ini = (u?.name || "").trim()[0]?.toUpperCase() || "D";
+    const since = st.since ? (d => `${d.getDate()} ${MONTHS[d.getMonth()].slice(0, 3).toUpperCase()} ${d.getFullYear()}`)(fromKey(st.since)) : "—";
+    const row = (k, v) => `<div class="kc-row"><span class="kc-k">${k}</span><span class="kc-v">${v}</span></div>`;
+    return `<span class="tape" aria-hidden="true"></span>
+      <p class="kc-head">Diary keeper’s card</p>
+      <span class="kc-seal" aria-hidden="true">${esc(ini)}</span>
+      ${row("Name", esc(u?.name || "—"))}
+      ${row("Since", since)}
+      <div class="kc-two">${row("Days", st.days)}${row("Photos", st.photos)}</div>
+      ${u?.email ? `<p class="kc-mail">${esc(u.email)}</p>` : ""}`;
   }
-  function renderMe() {
+  async function renderMe() {
+    const sum = await store.summary(), keys = Object.keys(sum).sort();
+    meStats = { since: keys[0] || null, days: keys.length, photos: keys.reduce((n, k) => n + sum[k].count, 0) };
     const lb = ls.get(LAST_BACKUP);
     const when = lb ? new Date(lb).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) : null;
     let status, actions;
