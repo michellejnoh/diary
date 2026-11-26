@@ -1,4 +1,4 @@
-export const VERSION = "77"; // bump on every change; shown at the bottom of Archive
+export const VERSION = "78"; // bump on every change; shown at the bottom of Archive
 // diary — app code. Loaded (and hot-swapped) by index.html.
 // mount(root, state) draws the app and returns an unmount function.
 
@@ -260,7 +260,7 @@ const EN_FONTS = [
   { key: "indieflower", family: "Indie Flower", name: "Indie Flower" },
   { key: "ebgaramond", family: "EB Garamond", name: "EB Garamond" },
 ];
-const pickFont = (list, key) => list.find(f => f.key === key) || list[0]; // default pair: Caveat + Nanum Pen Script
+const pickFont = list => list[0]; // fixed pair: Caveat + Nanum Pen Script
 const defPaper = () => getPref("diary.paper", "card"); // paper for days that haven't picked one
 const getPref = (k, d) => { try { return localStorage.getItem(k) || d; } catch { return d; } };
 const fontsNow = () => ({
@@ -1293,8 +1293,6 @@ export async function mount(root, state) {
     }
 
     const u = cloudStatus?.user;
-    const { ko, en } = fontsNow();
-    const fontBtns = (list, lang, cur, sample) => list.map(f => `<button class="font-opt" data-font="${f.key}" data-lang="${lang}" aria-pressed="${f.key === cur.key}"><span class="sample" style="font-family:'${f.family}'">${sample}</span><span class="name">${esc(f.name)}</span></button>`).join("");
     root.innerHTML = `
       <div class="wrap plainpage">
         <header class="top"><div class="barin topstack">
@@ -1303,13 +1301,6 @@ export async function mount(root, state) {
         </div></header>
         <section class="mecard">${meCardHTML()}</section>
         <section class="account keep" id="account">${accountHTML()}</section>
-
-        <section class="setting">
-          <h2 class="month-title">Handwriting</h2>
-          <p class="typed sub">For your notes and captions.</p>
-          <div class="font-grid">${fontBtns(KO_FONTS, "ko", ko, "오늘 하루")}</div>
-          <div class="font-grid">${fontBtns(EN_FONTS, "en", en, "Today")}</div>
-        </section>
 
         <section class="setting">
           <h2 class="month-title">Paper</h2>
