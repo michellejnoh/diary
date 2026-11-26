@@ -1,4 +1,4 @@
-export const VERSION = "61"; // bump on every change; shown at the bottom of Archive
+export const VERSION = "62"; // bump on every change; shown at the bottom of Archive
 // diary — app code. Loaded (and hot-swapped) by index.html.
 // mount(root, state) draws the app and returns an unmount function.
 
@@ -167,6 +167,39 @@ const LAYER_ICONS = (() => {
     back: svg(`${sq(4, false)}${sq(9, false)}${sq(14, true)}`),
   };
 })();
+// simple line icons for the Decorate menus
+const ICONS = (() => {
+  const svg = inner => `<svg viewBox="0 0 24 24" aria-hidden="true" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`;
+  return {
+    add: svg(`<path d="M12 5v14M5 12h14"/>`),
+    scraps: svg(`<path d="M4 7h16v3a2 2 0 0 0 0 4v3H4v-3a2 2 0 0 0 0-4z"/><path d="M14 7v10" stroke-dasharray="1.5 2"/>`),
+    page: svg(`<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/>`),
+    style: svg(`<path d="M5 19l5-14 5 14M7 14h6"/><path d="M19 12v7"/><circle cx="17.5" cy="16.5" r="2.5"/>`),
+    color: svg(`<circle cx="12" cy="12" r="7.5"/><path d="M12 4.5a7.5 7.5 0 0 1 0 15z" fill="currentColor"/>`),
+    marker: svg(`<path d="M14 4l6 6-8 8H8v-4z"/><path d="M4 21h9" stroke-width="3" opacity=".45"/>`),
+    frame: svg(`<rect x="4" y="4" width="16" height="16" rx="1"/><rect x="7" y="7" width="10" height="10"/>`),
+    look: svg(`<circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6 7 7M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4"/>`),
+    text: svg(`<path d="M5 6V4h14v2M12 4v16M9 20h6"/>`),
+    photo: svg(`<rect x="3" y="5" width="18" height="14" rx="1"/><path d="M3 16l5-5 4 4 3-3 6 6"/><circle cx="16" cy="9" r="1.5"/>`),
+    paste: svg(`<rect x="5" y="5" width="14" height="16" rx="1"/><path d="M9 5V3h6v2M9 11h6M9 15h4"/>`),
+    commons: svg(`<circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c3 3 3 14 0 17M12 3.5c-3 3-3 14 0 17"/>`),
+    tidy: svg(`<rect x="4" y="4" width="7" height="7"/><rect x="13" y="4" width="7" height="7"/><rect x="4" y="13" width="7" height="7"/><rect x="13" y="13" width="7" height="7"/>`),
+    outline: svg(`<path d="M12 4c4 0 7 3 7 7 0 5-4 9-7 9s-7-4-7-9c0-4 3-7 7-7z" stroke-dasharray="2 2.2"/>`),
+    ticket: svg(`<path d="M3 8h18v2.5a1.5 1.5 0 0 0 0 3V16H3v-2.5a1.5 1.5 0 0 0 0-3z"/><path d="M15 8v8" stroke-dasharray="1.5 2"/>`),
+    receipt: svg(`<path d="M6 3h12v18l-2-1.5-2 1.5-2-1.5-2 1.5-2-1.5-2 1.5z"/><path d="M9 8h6M9 11h6M9 14h4"/>`),
+    note: svg(`<path d="M5 5h14v9l-5 5H5z"/><path d="M14 19v-5h5"/>`),
+    label: svg(`<path d="M3 8h13l5 4-5 4H3z"/>`),
+    clip: svg(`<path d="M16 7v9a4 4 0 0 1-8 0V6a2.5 2.5 0 0 1 5 0v9a1 1 0 0 1-2 0V8"/>`),
+    print: svg(`<rect x="4" y="5" width="16" height="14"/><rect x="6.5" y="7.5" width="11" height="9"/>`),
+    instant: svg(`<rect x="5" y="3" width="14" height="18"/><rect x="7" y="5" width="10" height="10"/>`),
+    film: svg(`<rect x="3" y="5" width="18" height="14"/><rect x="7" y="8" width="10" height="8"/><path d="M5 7.5v.01M5 11v.01M5 14.5v.01M19 7.5v.01M19 11v.01M19 14.5v.01" stroke-width="2"/>`),
+    torn: svg(`<path d="M4 4h16v13l-2 1-2-2-2 2-2-1-2 2-2-2-2 2-2-1z"/>`),
+    none: svg(`<circle cx="12" cy="12" r="7.5"/>`),
+    grain: svg(`<circle cx="12" cy="12" r="7.5"/><path d="M9 9v.01M13 8v.01M15 12v.01M10 13v.01M12 16v.01M8 15.5v.01M16 15v.01M12 11v.01" stroke-width="2"/>`),
+    warm: svg(`<circle cx="12" cy="12" r="7.5"/><path d="M12 4.5a7.5 7.5 0 0 1 0 15" fill="currentColor" opacity=".35" stroke="none"/><path d="M12 4.5a7.5 7.5 0 0 0 0 15" fill="currentColor" opacity=".12" stroke="none"/>`),
+    bw: svg(`<circle cx="12" cy="12" r="7.5"/><path d="M12 4.5a7.5 7.5 0 0 0 0 15z" fill="currentColor"/>`),
+  };
+})();
 const UNDO_ICON = `<span class="glyph" aria-hidden="true">←</span>`;
 const REDO_ICON = `<span class="glyph" aria-hidden="true">→</span>`;
 // letters cut from magazines: one picture per letter in /cutout; anything else becomes a little paper scrap
@@ -244,7 +277,7 @@ function setBarColor(color) { // Safari top and bottom bars
   if (!m) { m = document.createElement("meta"); m.name = "theme-color"; document.head.append(m); }
   m.content = color;
 }
-const CARD = "#D5D7CE", DARK = "#1A1A17";
+const CARD = "#EAE3D3", DARK = "#1A1A17";
 
 // =====================================================================
 export async function mount(root, state) {
@@ -457,16 +490,13 @@ export async function mount(root, state) {
 
     root.innerHTML = `
       <div class="wrap${editing ? " decorating" : ""}">
-        <header class="top">
+        <header class="top"><div class="barin">
           <a class="wordmark bigmark" href="#/">Diary</a>
           <a class="navtag" href="#/archive">Archive</a>
-        </header>
+        </div></header>
         <div class="dayhead">
           <div class="daterow">
-            ${editing ? "" : `<a class="daynav" href="${hrefOf(prevK)}" data-nav="prev" aria-label="Previous day">‹</a>`}
             <h1 class="page-title day-title big-date">${title}</h1>
-            ${editing ? "" : isToday ? `<span class="daynav off" aria-hidden="true">›</span>` : `<a class="daynav" href="${hrefOf(nextK)}" data-nav="next" aria-label="Next day">›</a>`}
-            ${editing ? "" : `<span class="dayactions"><button class="link" data-decorate>Decorate</button><button class="link" data-saveimg>Save image</button></span>`}
           </div>
           ${editing ? `<div class="daysub"><span class="hint typed">Drag to move. Corner handle turns and resizes.</span></div>` : ""}
         </div>
@@ -480,6 +510,14 @@ export async function mount(root, state) {
         </div>
         ${editing ? "" : backupLine()}
       </div>
+      ${editing ? "" : `<nav class="botbar" aria-label="Day">
+        <div class="barin">
+          <a class="daynav" href="${hrefOf(prevK)}" data-nav="prev" aria-label="Previous day">‹</a>
+          <button class="barbtn" data-decorate>Decorate</button>
+          <button class="barbtn" data-saveimg>Save image</button>
+          ${isToday ? `<span class="daynav off" aria-hidden="true">›</span>` : `<a class="daynav" href="${hrefOf(nextK)}" data-nav="next" aria-label="Next day">›</a>`}
+        </div>
+      </nav>`}
       ${editing ? `<div class="decobar" role="toolbar" aria-label="Decorate"></div>` : ""}`;
 
     mountBoard(k, day, photos, preAssets);
@@ -928,19 +966,20 @@ export async function mount(root, state) {
     const tabsFor = { none: [["add", "Add"], ["scraps", "Scraps"], ["page", "Page"]], text: [["style", "Style"], ["color", "Color"], ["marker", "Marker"]], photo: [["frame", "Frame"], ["look", "Look"]], image: [], tape: [], scrap: [] }[kind];
     if (kind !== decoKind) { decoKind = kind; decoTab = kind in tabMemory ? tabMemory[kind] : (tabsFor[0]?.[0] || null); }
     const b = (attrs, label, pressed) => `<button ${attrs}${pressed != null ? ` aria-pressed="${!!pressed}"` : ""}>${label}</button>`;
+    const ib = (attrs, icon, name, pressed) => b(`${attrs} class="ico" aria-label="${name}" title="${name}"`, ICONS[icon], pressed); // icon-only option
     const opt = {
-      scraps: () => SCRAPS.map(([k, n]) => b(`data-scrap="${k}"`, n)).join(""),
-      add: () => `${b('data-deco="text"', "Text")}${b('data-deco="photo"', "Photo")}${b('data-deco="paste"', "Paste")}${b('data-deco="commons"', "Wikimedia")}`,
-      page: () => `${PAPERS.map(([f, n]) => b(`data-paper="${f}" class="paper-btn pb-${f}"`, n, curPaper() === f)).join("")}<span class="group-sep"></span>
-        ${b('data-deco="tidy"', "Tidy up")}`,
-      style: () => `<span class="group">${[["hand", "Hand"], ["type", "Type"], ["press", "Press"], ["cut", "Cutout"]].map(([f, n]) => b(`data-tx="font" data-v="${f}" class="f-${f}"`, n, (it.font || "hand") === f)).join("")}</span>
+      scraps: () => SCRAPS.map(([k, n]) => ib(`data-scrap="${k}"`, k, n)).join(""),
+      add: () => `${ib('data-deco="text"', "text", "Text")}${ib('data-deco="photo"', "photo", "Photo")}${ib('data-deco="paste"', "paste", "Paste")}${ib('data-deco="commons"', "commons", "Wikimedia")}`,
+      page: () => `${PAPERS.map(([f, n]) => b(`data-paper="${f}" class="paper-btn pb-${f}" aria-label="${n}" title="${n}"`, "", curPaper() === f)).join("")}<span class="group-sep"></span>
+        ${ib('data-deco="tidy"', "tidy", "Tidy up")}`,
+      style: () => `<span class="group">${[["hand", "Hand"], ["type", "Type"], ["press", "Press"], ["cut", "Cutout"]].map(([f, n]) => b(`data-tx="font" data-v="${f}" class="f-${f} fa" aria-label="${n}" title="${n}"`, "Aa", (it.font || "hand") === f)).join("")}</span>
         ${b('data-tx="tape" aria-label="Tape behind text"', `<span class="tape-swatch"></span>`, it.tape)}`,
       color: () => COLORS.map(c => b(`data-tx="color" data-v="${c}" class="dot" style="--c:${c}" aria-label="Color ${c}"`, "", (it.color || COLORS[0]) === c)).join(""),
       marker: () => b('data-tx="hl" data-v="" class="hl-none" aria-label="No highlighter"', "", !it.hl) + HILITES.map(c => b(`data-tx="hl" data-v="${c}" class="hl-dot" style="--c:${c}" aria-label="Highlighter ${c}"`, "", it.hl === c)).join(""),
-      frame: () => [["print", "Print"], ["instant", "Instant"], ["film", "Film"], ["torn", "Torn"]].map(([f, n]) => b(`data-ph="frame" data-v="${f}"`, n, (it.frame || "print") === f)).join(""),
-      look: () => [["none", "Plain"], ["grain", "Grain"], ["warm", "Warm"], ["bw", "B&amp;W"]].map(([f, n]) => b(`data-ph="look" data-v="${f}"`, n, (it.look || "none") === f)).join(""),
+      frame: () => [["print", "Print"], ["instant", "Instant"], ["film", "Film"], ["torn", "Torn"]].map(([f, n]) => ib(`data-ph="frame" data-v="${f}"`, f, n, (it.frame || "print") === f)).join(""),
+      look: () => [["none", "Plain"], ["grain", "Grain"], ["warm", "Warm"], ["bw", "B&amp;W"]].map(([f, n]) => ib(`data-ph="look" data-v="${f}"`, f, n, (it.look || "none") === f)).join(""),
     };
-    const actions = (it ? (it.kind === "image" ? b('data-deco="outline"', "Outline", it.outline) : "") + `<span class="group" aria-label="Order">${[["front", "Front", LAYER_ICONS.front], ["up", "Forward", LAYER_ICONS.up], ["down", "Backward", LAYER_ICONS.down], ["back", "Back", LAYER_ICONS.back]].map(([k, n, ic]) => b(`data-layer="${k}" class="layer" aria-label="${n}" title="${n}"`, ic)).join("")}</span>` : "");
+    const actions = (it ? (it.kind === "image" ? ib('data-deco="outline"', "outline", "Outline", it.outline) : "") + `<span class="group" aria-label="Order">${[["front", "Front", LAYER_ICONS.front], ["up", "Forward", LAYER_ICONS.up], ["down", "Backward", LAYER_ICONS.down], ["back", "Back", LAYER_ICONS.back]].map(([k, n, ic]) => b(`data-layer="${k}" class="layer" aria-label="${n}" title="${n}"`, ic)).join("")}</span>` : "");
     const panel = (decoTab ? opt[decoTab]() : "") + (actions ? `<span class="group-sep"></span>${actions}` : "");
     // keep the option row where it was scrolled, as long as the same menu stays open
     const keyNow = `${kind}:${decoTab}`;
@@ -949,7 +988,7 @@ export async function mount(root, state) {
     bar.innerHTML = `
       ${panel ? `<div class="decopanel"><div class="decoscroll">${panel}</div></div>` : ""}
       <div class="decorow">
-        <div class="decotabs" role="tablist">${tabsFor.map(([k, n]) => `<button role="tab" class="dtab" data-dtab="${k}" aria-selected="${decoTab === k}">${n}</button>`).join("") || `<span class="typed dt-note">${it?.kind === "image" ? "Photo sticker" : it?.kind === "tape" ? "Tape" : ""}</span>`}</div>
+        <div class="decotabs" role="tablist">${tabsFor.map(([k, n]) => `<button role="tab" class="dtab" data-dtab="${k}" aria-selected="${decoTab === k}" aria-label="${n}" title="${n}">${ICONS[k]}</button>`).join("") || `<span class="typed dt-note">${it?.kind === "image" ? "Photo sticker" : it?.kind === "tape" ? "Tape" : ""}</span>`}</div>
         <div class="deco-end">
           ${b(`data-deco="undo" class="icon" aria-label="Undo" title="Undo"${undoStack.length ? "" : " disabled"}`, UNDO_ICON)}
           ${b(`data-deco="redo" class="icon" aria-label="Redo" title="Redo"${redoStack.length ? "" : " disabled"}`, REDO_ICON)}
@@ -1112,22 +1151,45 @@ export async function mount(root, state) {
         boardEl, items: col.items, photos: photoMap(), assets, note: root.querySelector("#note")?.value || "",
         titleSoft: isToday ? "Today," : `${WEEKDAYS[d.getDay()]},`,
         titleMain: `${d.getDate()} ${MONTHS[d.getMonth()]}${isToday || d.getFullYear() === new Date().getFullYear() ? "" : " " + d.getFullYear()}`,
-        colors: COLORS, paper: curPaper(),
+        colors: COLORS, paper: curPaper(), seed: k,
       });
       const blob = await new Promise(r => cv.toBlob(r, "image/png"));
       const name = `diary-${k}.png`;
-      const file = new File([blob], name, { type: "image/png" });
-      if (touch() && navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file] }); // choose "Save Image" to put it in Photos
-      } else {
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(file); a.download = name;
-        document.body.append(a); a.click(); a.remove();
-        setTimeout(() => URL.revokeObjectURL(a.href), 2000);
-      }
+      showTornPage(new File([blob], name, { type: "image/png" }));
     } catch (err) {
-      if (err?.name !== "AbortError") { console.error(err); alert("The picture couldn’t be made. Try again."); }
+      console.error(err); alert("The picture couldn’t be made. Try again.");
     } finally { btn.textContent = label; btn.disabled = false; }
+  }
+
+  // the page tears out of the album, then waits for Save (so the tap can open the share sheet)
+  function showTornPage(file) {
+    const url = URL.createObjectURL(file);
+    const ov = document.createElement("div");
+    ov.className = "tearbox";
+    ov.innerHTML = `
+      <div class="tear-album">
+        <div class="tear-spine">${"<i></i>".repeat(12)}</div>
+        <div class="tear-page"><img src="${url}" alt="Your day as an album page"></div>
+      </div>
+      <div class="tear-actions"><button class="link" data-tclose>Close</button><button class="tear-save" data-tsave>Save</button></div>`;
+    document.body.append(ov);
+    requestAnimationFrame(() => requestAnimationFrame(() => ov.classList.add("open")));
+    setTimeout(() => ov.classList.add("torn"), 650);
+    const close = () => { ov.classList.remove("open"); setTimeout(() => { ov.remove(); URL.revokeObjectURL(url); }, 300); };
+    ov.addEventListener("click", async e => {
+      if (e.target.closest("[data-tclose]") || e.target === ov) return close();
+      if (!e.target.closest("[data-tsave]")) return;
+      try {
+        if (touch() && navigator.canShare?.({ files: [file] })) {
+          await navigator.share({ files: [file] }); // choose "Save Image" to put it in Photos
+        } else {
+          const a = document.createElement("a");
+          a.href = url; a.download = file.name;
+          document.body.append(a); a.click(); a.remove();
+        }
+        close();
+      } catch (err) { if (err?.name !== "AbortError") alert("The picture couldn’t be saved. Try again."); }
+    });
   }
 
   // ---------- archive page ----------
@@ -1179,10 +1241,10 @@ export async function mount(root, state) {
 
     root.innerHTML = `
       <div class="wrap">
-        <header class="top">
+        <header class="top"><div class="barin">
           <a class="wordmark bigmark" href="#/">Diary</a>
           <a class="navtag" href="#/">Today</a>
-        </header>
+        </div></header>
         <h1 class="page-title day-title big-date archive-title">Archive</h1>
         <p class="summary">${photoTotal ? `${photoTotal} photo${photoTotal > 1 ? "s" : ""} over ${dates.length} day${dates.length > 1 ? "s" : ""}` : "Nothing here yet."}</p>
         <div class="months">${months}</div>
