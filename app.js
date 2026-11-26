@@ -1,4 +1,4 @@
-export const VERSION = "58"; // bump on every change; shown at the bottom of Archive
+export const VERSION = "59"; // bump on every change; shown at the bottom of Archive
 // diary — app code. Loaded (and hot-swapped) by index.html.
 // mount(root, state) draws the app and returns an unmount function.
 
@@ -1134,10 +1134,11 @@ export async function mount(root, state) {
     const photoTotal = dates.reduce((n, k) => n + sum[k].count, 0);
 
     let months = "";
-    for (let y = now.getFullYear(), m = now.getMonth(); y > first.getFullYear() || (y === first.getFullYear() && m >= first.getMonth()); m--) {
-      if (m < 0) { m = 11; y--; continue; }
+    // oldest month first, oldest day first
+    for (let y = first.getFullYear(), m = first.getMonth(); y < now.getFullYear() || (y === now.getFullYear() && m <= now.getMonth()); m++) {
+      if (m > 11) { m = 0; y++; continue; }
       const prefix = `${y}-${pad(m + 1)}-`;
-      const days = dates.filter(k => k.startsWith(prefix)).reverse();
+      const days = dates.filter(k => k.startsWith(prefix));
       const daysIn = new Date(y, m + 1, 0).getDate();
       const piles = days.map(k => {
         const s2 = sum[k], dd = fromKey(k);
