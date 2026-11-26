@@ -1,4 +1,4 @@
-export const VERSION = "74"; // bump on every change; shown at the bottom of Archive
+export const VERSION = "75"; // bump on every change; shown at the bottom of Archive
 // diary — app code. Loaded (and hot-swapped) by index.html.
 // mount(root, state) draws the app and returns an unmount function.
 
@@ -198,6 +198,16 @@ const ICONS = (() => {
     grain: svg(`<circle cx="12" cy="12" r="7.5"/><path d="M9 9v.01M13 8v.01M15 12v.01M10 13v.01M12 16v.01M8 15.5v.01M16 15v.01M12 11v.01" stroke-width="2"/>`),
     warm: svg(`<circle cx="12" cy="12" r="7.5"/><path d="M12 4.5a7.5 7.5 0 0 1 0 15" fill="currentColor" opacity=".35" stroke="none"/><path d="M12 4.5a7.5 7.5 0 0 0 0 15" fill="currentColor" opacity=".12" stroke="none"/>`),
     bw: svg(`<circle cx="12" cy="12" r="7.5"/><path d="M12 4.5a7.5 7.5 0 0 0 0 15z" fill="currentColor"/>`),
+  };
+})();
+// bottom bar icons
+const BAR_ICON = (() => {
+  const svg = inner => `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`;
+  return {
+    decorate: svg(`<path d="M4 20l1.2-4.4L15.8 5a2 2 0 0 1 2.8 0l.4.4a2 2 0 0 1 0 2.8L8.4 18.8z"/><path d="M14 6.8l3.2 3.2"/><path d="M13 20h7" stroke-dasharray="1.6 2.4"/>`),
+    save: svg(`<path d="M12 4v10M8 10.5l4 4 4-4"/><path d="M4.5 15v3.5a1.5 1.5 0 0 0 1.5 1.5h12a1.5 1.5 0 0 0 1.5-1.5V15"/>`),
+    archive: svg(`<rect x="3.5" y="5" width="17" height="14.5" rx="1"/><path d="M3.5 9.5h17M9.5 13h5"/><path d="M6 5V3.5h12V5"/>`),
+    today: svg(`<rect x="4" y="5" width="16" height="15" rx="1"/><path d="M4 9.5h16M8.5 3v4M15.5 3v4"/><circle cx="12" cy="14.5" r="1.6" fill="currentColor" stroke="none"/>`),
   };
 })();
 const UNDO_ICON = `<span class="glyph" aria-hidden="true">←</span>`;
@@ -514,9 +524,9 @@ export async function mount(root, state) {
       ${editing ? "" : `<nav class="botbar" aria-label="Day">
         <div class="barin">
           <a class="daynav" href="${hrefOf(prevK)}" data-nav="prev" aria-label="Previous day">‹</a>
-          <button class="barbtn" data-decorate>Decorate</button>
-          <button class="barbtn" data-saveimg>Save image</button>
-          <a class="barbtn" href="#/archive">Archive</a>
+          <button class="barbtn" data-decorate>${BAR_ICON.decorate}<span class="bl">Decorate</span></button>
+          <button class="barbtn" data-saveimg>${BAR_ICON.save}<span class="bl">Save image</span></button>
+          <a class="barbtn" href="#/archive">${BAR_ICON.archive}<span class="bl">Archive</span></a>
           ${isToday ? `<span class="daynav off" aria-hidden="true">›</span>` : `<a class="daynav" href="${hrefOf(nextK)}" data-nav="next" aria-label="Next day">›</a>`}
         </div>
       </nav>`}
@@ -1143,7 +1153,7 @@ export async function mount(root, state) {
 
   // ---------- save the day as a picture ----------
   async function saveImage(btn) {
-    const label = btn.textContent; btn.textContent = "Saving…"; btn.disabled = true;
+    const lab = btn.querySelector(".bl") || btn, label = lab.textContent; lab.textContent = "Saving…"; btn.disabled = true;
     try {
       await flushText();
       const k = route().date, d = fromKey(k), isToday = k === todayKey();
@@ -1160,7 +1170,7 @@ export async function mount(root, state) {
       showTornPage(new File([blob], name, { type: "image/png" }), PAPER_FILL[curPaper()] || PAPER_FILL.card);
     } catch (err) {
       console.error(err); alert("The picture couldn’t be made. Try again.");
-    } finally { btn.textContent = label; btn.disabled = false; }
+    } finally { lab.textContent = label; btn.disabled = false; }
   }
 
   // the page tears out of the album, then waits for Save (so the tap can open the share sheet)
@@ -1235,7 +1245,7 @@ export async function mount(root, state) {
         <div class="months">${months}</div>
 
       </div>
-      <nav class="botbar" aria-label="Pages"><div class="barin"><a class="barbtn" href="#/">Today</a></div></nav>`;
+      <nav class="botbar" aria-label="Pages"><div class="barin"><a class="barbtn" href="#/">${BAR_ICON.today}<span class="bl">Today</span></a></div></nav>`;
     window.scrollTo(0, state.scroll?.[location.hash] || 0);
   }
 
@@ -1312,7 +1322,7 @@ export async function mount(root, state) {
         </div>
         <p class="version typed">version ${VERSION}</p>
       </div>
-      <nav class="botbar" aria-label="Pages"><div class="barin"><a class="barbtn" href="#/">Today</a><a class="barbtn" href="#/archive">Archive</a></div></nav>`;
+      <nav class="botbar" aria-label="Pages"><div class="barin"><a class="barbtn" href="#/">${BAR_ICON.today}<span class="bl">Today</span></a><a class="barbtn" href="#/archive">${BAR_ICON.archive}<span class="bl">Archive</span></a></div></nav>`;
     window.scrollTo(0, 0);
   }
 
