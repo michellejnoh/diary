@@ -980,3 +980,6 @@ header.top::before { box-shadow: none; }
 
 /* sheets, the photo viewer and the paste box sit above the bars */
 .sheet, .pastebox, .viewer { z-index: 60 !important; }
+
+/* iPhone Safari can clip both directions when only one is asked for, cutting off the tape under the top bar */
+header.top { overflow: visible !important; }
